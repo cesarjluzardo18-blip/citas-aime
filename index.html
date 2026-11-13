@@ -167,6 +167,10 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 
   <!-- INICIO -->
   <section id="v-inicio">
+    <div class="alert hidden" id="notiBanner" style="background:#E6EEFA"><b style="color:#3D6597">🔔 Avisos de citas</b>
+      <span id="notiBannerTx">Recibe un aviso el día antes y 1 hora antes de cada cita.</span>
+      <button class="btn primary bNoti" type="button" style="background:#7FA6DA;margin-top:10px;padding:10px">Activar avisos</button></div>
+    <button class="alert hidden" id="pendAviso" style="display:block;width:100%;text-align:left;border:0"><b>👋 Solicitudes de acceso</b><span id="pendAvisoTx"></span> <u>Revisar</u></button>
     <div id="heroBox"></div>
     <div class="seg" id="segCitas">
       <button class="on" data-s="prox">Próximas</button>
@@ -212,11 +216,16 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     <div class="section-title"><h2>Contactos</h2><button class="chip editOnly" style="background:var(--main-soft);color:var(--main-dark)" id="addContacto">+ Añadir</button></div>
     <div class="card" id="contactosBox"></div>
     <div id="personasWrap" class="hidden">
-      <div class="section-title"><h2>Personas con acceso</h2><span class="chip hidden" id="pendBadge" style="background:#FFF1D6;color:#8A6A12"></span></div>
+      <div class="section-title"><h2>Personas</h2><span class="chip hidden" id="pendBadge" style="background:#FFF1D6;color:#8A6A12"></span></div>
+      <div class="small" id="activosTx" style="margin:-4px 4px 8px;color:#2F7A57;font-weight:700"></div>
       <div class="card" id="personasBox"></div>
+      <div class="small hidden" id="rolesHelp" style="margin:0 4px 8px">«Solo ver»: ve todo pero no cambia nada. «Puede editar»: añade y cambia citas y también aprueba a otras personas. «Sin acceso»: no puede entrar.</div>
     </div>
     <div class="section-title"><h2>Mi cuenta</h2></div>
-    <div class="card"><div class="small" id="yoBox"></div><button class="btn ghost bSalir" type="button">Cerrar sesión</button></div>
+    <div class="card"><div class="small" id="yoBox"></div>
+      <div class="small" id="notiEstado" style="margin-top:10px"></div>
+      <button class="btn primary hidden bNoti" type="button" style="background:#7FA6DA">🔔 Activar avisos en este móvil</button>
+      <button class="btn ghost bSalir" type="button">Cerrar sesión</button></div>
   </section>
   </div>
 </div>
@@ -236,7 +245,8 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, getDoc, getDocs, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, getDoc, getDocs, updateDoc, query, where, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAA_ITUXcmrj_re645jLI7STXscfLL5m4o",
@@ -247,6 +257,7 @@ const firebaseConfig = {
   appId: "1:203341907408:web:1da2aa4e342b1b133a65d5"
 };
 const ADMIN = "cesarjluzardo18@gmail.com";
+const VAPID = "__VAPID__"; // clave pública de Cloud Messaging
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 let fdb; try{ fdb = initializeFirestore(fbApp,{localCache:persistentLocalCache()}); }catch(e){ fdb = getFirestore(fbApp); }
@@ -804,42 +815,124 @@ function screen(name){
   $("nav.tabs").classList.toggle("hidden",name!=="main");
   if(name!=="main")$("#fab").classList.remove("show"); else updateFab();
 }
+function haceCuanto(ms){
+  const s=Math.round((Date.now()-ms)/1000);
+  if(s<150) return "🟢 Activo ahora";
+  const m=Math.round(s/60); if(m<60) return `Visto hace ${m} min`;
+  const hh=Math.round(m/60); const d=new Date(ms);
+  if(hh<24 && d.getDate()===new Date().getDate()) return `Visto hoy a las ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const ay=new Date(); ay.setDate(ay.getDate()-1);
+  if(d.toDateString()===ay.toDateString()) return `Visto ayer a las ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `Visto el ${d.getDate()} ${MESES[d.getMonth()].slice(0,3)} a las ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+const msDe=v=>v&&v.toMillis?v.toMillis():(v?new Date(v).getTime():0);
 function renderPersonas(){
   const box=$("#personasBox"); if(!box)return;
-  $("#personasWrap").classList.toggle("hidden",!S.isAdmin);
-  if(!S.isAdmin)return;
-  const us=S.usuarios.filter(u=>u.id!==S.uid).sort((a,b)=>(a.rol==="pendiente"?0:1)-(b.rol==="pendiente"?0:1)||(a.nombre||"").localeCompare(b.nombre||""));
-  box.innerHTML=us.length?us.map(u=>`<div class="list-item">
-      <span class="ico" style="background:${u.rol==="pendiente"?"#FFF1D6":u.rol==="editar"?"#DDF2E8":u.rol==="ver"?"#EEF3FB":"#F3E9E2"}">${u.rol==="pendiente"?"⏳":u.rol==="editar"?"✏️":u.rol==="ver"?"👀":"🚫"}</span>
-      <span class="tx"><b>${esc(u.nombre||"Sin nombre")}</b><span>${esc(u.email||"")}</span></span>
-      <select data-rol="${esc(u.id)}" style="width:auto;padding:8px;font-size:13px">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.rol===k?"selected":""}>${v}</option>`).join("")}</select>
-    </div>`).join(""):`<div class="empty small">Cuando alguien se registre, aparecerá aquí para que lo apruebes.</div>`;
-  const pend=us.filter(u=>u.rol==="pendiente").length;
+  $("#personasWrap").classList.toggle("hidden",!S.gestiona);
+  if(!S.gestiona)return;
+  const esAdm=u=>(u.email||"").toLowerCase()===ADMIN;
+  const orden=u=>u.rol==="pendiente"&&!esAdm(u)?0:1;
+  const us=S.usuarios.slice().sort((a,b)=>orden(a)-orden(b)||msDe(b.ultimaVez)-msDe(a.ultimaVez));
+  const activos=us.filter(u=>msDe(u.ultimaVez)&&Date.now()-msDe(u.ultimaVez)<150000).length;
+  $("#activosTx").textContent=activos?`${activos} conectado${activos>1?"s":""} ahora`:"";
+  box.innerHTML=us.length?us.map(u=>{
+    const adm=esAdm(u), yo=u.id===S.uid, r=adm?"admin":u.rol;
+    const ico={admin:"👑",pendiente:"⏳",editar:"✏️",ver:"👀"}[r]||"🚫";
+    const bg={admin:"#FDE6DB",pendiente:"#FFF1D6",editar:"#DDF2E8",ver:"#EEF3FB"}[r]||"#F3E9E2";
+    const visto=msDe(u.ultimaVez)?haceCuanto(msDe(u.ultimaVez)):(u.rol==="pendiente"?"Esperando aprobación":"Aún no ha entrado");
+    const ctrl = adm ? `<span class="chip" style="background:#FDE6DB;color:var(--main-dark)">Admin</span>`
+      : yo ? `<span class="chip" style="background:#DDF2E8;color:#2F7A57">Tú</span>`
+      : `<select data-rol="${esc(u.id)}" style="width:auto;padding:8px;font-size:13px">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.rol===k?"selected":""}>${v}</option>`).join("")}</select>`;
+    return `<div class="list-item">
+      <span class="ico" style="background:${bg}">${ico}</span>
+      <span class="tx"><b>${esc(u.nombre||"Sin nombre")}${yo?" (tú)":""}</b><span>${esc(visto)}</span><span style="display:block;font-size:12px">${esc(u.email||"")}</span></span>
+      ${ctrl}</div>`;}).join(""):`<div class="empty small">Cuando alguien se registre, aparecerá aquí para aprobarlo.</div>`;
+  const pend=us.filter(u=>u.rol==="pendiente"&&!esAdm(u)).length;
   $("#pendBadge").textContent=pend?`${pend} pendiente${pend>1?"s":""}`:"";
   $("#pendBadge").classList.toggle("hidden",!pend);
+  // aviso en Inicio para quien gestiona
+  $("#pendAviso").classList.toggle("hidden",!pend);
+  $("#pendAvisoTx").textContent=pend?`${pend} persona${pend>1?"s quieren":" quiere"} entrar a la app.`:"";
 }
+setInterval(()=>{ if(S.gestiona) renderPersonas(); },30000);
+
+/* ---------- presencia: quién está conectado ---------- */
+let latido=null;
+async function marcarActivo(){
+  if(!S.uid||document.visibilityState==="hidden")return;
+  try{ await fb.updateDoc(fb.doc(fdb,"usuarios/"+S.uid),{ultimaVez:serverTimestamp()}); }catch(e){}
+}
+function empezarLatido(){ if(latido)return; latido=setInterval(marcarActivo,60000); setTimeout(marcarActivo,0); }
+function pararLatido(){ if(latido){clearInterval(latido);latido=null} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") marcarActivo(); });
+
 document.addEventListener("change",async e=>{
   const s=e.target.closest("select[data-rol]"); if(!s)return;
   try{ await fb.updateDoc(fb.doc(fdb,"usuarios/"+s.dataset.rol),{rol:s.value}); toast("Permiso cambiado ✓"); }
   catch(err){ toast("No se pudo cambiar el permiso"); }
 });
 
+/* ---------- notificaciones ---------- */
+const esStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const esIOS = () => /iP(hone|ad|od)/.test(navigator.platform || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let pushOK = null;
+function lsGet(k){ try{return localStorage.getItem(k)}catch(e){return null} }
+function lsSet(k,v){ try{localStorage.setItem(k,v)}catch(e){} }
+async function estadoAvisos(){
+  if(pushOK===null){ try{ pushOK = VAPID.length>20 && "serviceWorker" in navigator && "Notification" in window && await isSupported(); }catch(e){ pushOK=false; } }
+  const perm = ("Notification" in window) ? Notification.permission : "unsupported";
+  let txt="", boton=false, banner=false;
+  if(!pushOK){
+    if(esIOS() && !esStandalone()){ txt="Para recibir avisos, añade la app a la pantalla de inicio (Safari → Compartir → Añadir a pantalla de inicio) y ábrela desde ahí."; banner=true; }
+    else txt="Este navegador no permite avisos. Usa el botón 🔔 de cada cita para añadirla a tu calendario.";
+  } else if(perm==="granted"){ txt="✅ Avisos activados en este móvil."; boton=!lsGet("notiOK_"+S.uid); }
+  else if(perm==="denied"){ txt="Los avisos están bloqueados. Actívalos en Ajustes del móvil → Notificaciones → Aime."; }
+  else { txt="Los avisos están desactivados en este móvil."; boton=true; banner=true; }
+  $("#notiEstado").textContent=txt;
+  document.querySelectorAll(".bNoti").forEach(b=>b.classList.toggle("hidden",!boton));
+  $("#notiBanner").classList.toggle("hidden",!banner);
+  if(banner && !boton) $("#notiBannerTx").textContent=txt;
+}
+async function activarAvisos(){
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm!=="granted"){ toast("No se han permitido los avisos"); estadoAvisos(); return; }
+    const reg = await navigator.serviceWorker.register("./firebase-messaging-sw.js",{scope:"./"});
+    await navigator.serviceWorker.ready;
+    const token = await getToken(getMessaging(fbApp),{vapidKey:VAPID, serviceWorkerRegistration:reg});
+    if(!token) throw new Error("sin token");
+    await setDoc(doc(fdb,"tokens/"+S.uid),{tokens:arrayUnion(token),actualizado:new Date().toISOString()},{merge:true});
+    lsSet("notiOK_"+S.uid,"1");
+    toast("🔔 Avisos activados"); estadoAvisos();
+  }catch(e){ console.error(e); toast("No se pudieron activar los avisos"); }
+}
+document.querySelectorAll(".bNoti").forEach(b=>b.onclick=activarAvisos);
+function escucharAvisos(){
+  try{ if(pushOK && Notification.permission==="granted") onMessage(getMessaging(fbApp),m=>toast((m.notification&&m.notification.title)||"Aviso")); }catch(e){}
+}
+
 let started=false;
 function startApp(){
   screen("main");
   const b=$("#roleBadge"); b.classList.remove("hidden"); b.textContent=S.isAdmin?"👑 Admin":S.canWrite?"✏️ Editar":"👀 Solo ver";
+  $("#rolesHelp").classList.toggle("hidden",!S.gestiona);
   $("#yoBox").textContent=`${S.nombre||""} · ${S.email}`;
   updateFab(); render(); renderPersonas();
+  estadoAvisos().then(escucharAvisos);
+  empezarLatido();
+  if(S.gestiona && !unUsers) unUsers=fb.onSnapshot(fb.collection(fdb,"usuarios"),s=>{S.usuarios=s.docs.map(d=>({id:d.id,...d.data()}));renderPersonas();},()=>{});
+  if(!S.gestiona && unUsers){ unUsers(); unUsers=null; S.usuarios=[]; }
   if(started)return; started=true;
   status("Cargando…");
   const timer=setTimeout(()=>status("No se pueden cargar los datos ahora mismo. Revisa la conexión."),10000);
   unsubs.push(db.doc("ficha/aime").onSnapshot(s=>{S.ficha=s.exists?s.data():{};render();},()=>{}));
   unsubs.push(db.doc("ficha/foto").onSnapshot(s=>{S.foto=s.exists?(s.data().img||""):"";renderHeader();},()=>{}));
-  if(S.isAdmin) unsubs.push(fb.onSnapshot(fb.collection(fdb,"usuarios"),s=>{S.usuarios=s.docs.map(d=>({id:d.id,...d.data()}));renderPersonas();},()=>{}));
+
   Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos")])
     .then(()=>{clearTimeout(timer);status("");});
 }
-function stopAll(){ unsubs.splice(0).forEach(u=>{try{u()}catch(e){}}); started=false; }
+let unUsers=null;
+function stopAll(){ unsubs.splice(0).forEach(u=>{try{u()}catch(e){}}); if(unUsers){unUsers();unUsers=null} pararLatido(); started=false; }
 
 const AUTH_ERR={"auth/invalid-credential":"Correo o contraseña incorrectos","auth/wrong-password":"Correo o contraseña incorrectos","auth/user-not-found":"No hay ninguna cuenta con ese correo","auth/email-already-in-use":"Ese correo ya tiene cuenta. Pulsa «Entrar»","auth/weak-password":"La contraseña debe tener al menos 6 caracteres","auth/invalid-email":"El correo no es válido","auth/too-many-requests":"Demasiados intentos. Espera un poco","auth/network-request-failed":"Sin conexión a internet"};
 let authMode="login";
@@ -878,9 +971,9 @@ fb.onAuthStateChanged(auth,async u=>{
   unMe=fb.onSnapshot(ref,s=>{
     const d=s.exists()?s.data():{}; S.nombre=d.nombre||""; const rol=d.rol||"pendiente";
     if(S.isAdmin||rol==="ver"||rol==="editar"){
-      S.canWrite=S.isAdmin||rol==="editar"; startApp();
+      S.canWrite=S.isAdmin||rol==="editar"; S.gestiona=S.canWrite; startApp();
     }else{
-      stopAll(); $("#waitMsg").textContent=rol==="bloqueado"?"Ahora mismo no tienes acceso a esta app.":"Tu cuenta está creada. Cuando el administrador te apruebe, entrarás automáticamente.";
+      stopAll(); $("#waitMsg").textContent=rol==="bloqueado"?"Ahora mismo no tienes acceso a esta app.":"Tu cuenta está creada. Cuando te aprueben, entrarás automáticamente.";
       screen("wait");
     }
   },()=>screen("wait"));
@@ -893,6 +986,7 @@ document.querySelectorAll("#segSalud button").forEach(b=>b.onclick=()=>{S.segS=b
 $("#calPrev").onclick=()=>{S.calM--;if(S.calM<0){S.calM=11;S.calY--}render()};
 $("#calNext").onclick=()=>{S.calM++;if(S.calM>11){S.calM=0;S.calY++}render()};
 $("#editFicha").onclick=formFicha;
+$("#pendAviso").onclick=()=>setView("ficha");
 $("#bCalTodas").onclick=()=>avisoCalendario(sortCitas(S.citas));
 $("#avatar").onclick=()=>{
   if(!S.canWrite) return;
