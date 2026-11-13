@@ -186,6 +186,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <div class="grid" id="calGrid"></div>
       <div class="legend" id="legend"></div>
     </div>
+    <button class="btn ghost" id="bCalTodas" style="margin:0 0 4px">🔔 Añadir avisos de todas las próximas citas</button>
     <div class="section-title"><h2 id="dayTitle"></h2></div>
     <div id="dayList"></div>
   </section>
@@ -482,10 +483,12 @@ function showCita(id){
       <div class="thumbs" id="thumbs"><div class="small" style="grid-column:1/-1">Cargando…</div></div>
       <input type="file" id="docInput" accept="image/*" multiple class="hidden">
     </div>
+    ${c.fecha>=todayStr()?`<button class="btn primary" id="bCal" style="background:#7FA6DA">🔔 Añadir aviso a mi calendario</button>`:""}
     ${S.canWrite?`<button class="btn primary" id="bEdit">Editar</button>`:""}
     <button class="btn ghost" id="bClose">Cerrar</button>`);
   $("#bClose").onclick=closeSheet;
   if(S.canWrite)$("#bEdit").onclick=()=>formCita(c);
+  if($("#bCal"))$("#bCal").onclick=()=>avisoCalendario([c]);
   cargarFotos(c.id);
   $("#docInput").onchange=async e=>{
     const files=[...(e.target.files||[])]; e.target.value=""; if(!files.length)return;
@@ -728,6 +731,42 @@ function verFoto(id){
   if(S.canWrite)$("#bDelF").onclick=()=>confirmDel("esta foto",async()=>{try{await db.doc("fotos/"+id).delete();delete fotosCache[id];toast("Borrada");showCita(f.citaId)}catch(e){handleWriteErr(e)}});
 }
 
+/* ---------- avisos en el calendario ---------- */
+function icsEsc(s){return String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
+function icsFold(l){const out=[];while(l.length>70){out.push(l.slice(0,70));l=" "+l.slice(70)}out.push(l);return out.join("\r\n")}
+function avisoCalendario(lista){
+  lista=lista.filter(c=>c.fecha&&c.fecha>=todayStr());
+  if(!lista.length){toast("No hay citas próximas");return}
+  const nombre=(S.ficha&&S.ficha.nombre)||"Aime";
+  const now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Citas de Aime//ES","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+  lista.forEach(c=>{
+    const t=tipo(c.tipo), d=c.fecha.replace(/-/g,"");
+    L.push("BEGIN:VEVENT","UID:"+c.id+"@citas-aime","DTSTAMP:"+now);
+    if(c.hora){
+      const [hh,mm]=c.hora.split(":").map(Number); const fin=new Date(2000,0,1,hh+1,mm);
+      L.push("DTSTART:"+d+"T"+pad(hh)+pad(mm)+"00","DTEND:"+(hh>=23?d:d)+"T"+pad(hh>=23?23:fin.getHours())+pad(hh>=23?59:fin.getMinutes())+"00");
+    }else{
+      const n=parseD(c.fecha); n.setDate(n.getDate()+1);
+      L.push("DTSTART;VALUE=DATE:"+d,"DTEND;VALUE=DATE:"+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate()));
+    }
+    L.push(icsFold("SUMMARY:"+icsEsc(`${t.e} ${nombre}: ${c.titulo||t.n}`)));
+    if(c.lugar)L.push(icsFold("LOCATION:"+icsEsc(c.lugar)));
+    const desc=[c.quien?`Quién la lleva: ${c.quien}`:"",c.notas?`Llevar / preguntar: ${c.notas}`:""].filter(Boolean).join("\n");
+    if(desc)L.push(icsFold("DESCRIPTION:"+icsEsc(desc)));
+    // Aviso el día antes y, si tiene hora, una hora antes
+    L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(`Mañana: ${c.titulo||t.n} de ${nombre}`),c.hora?"TRIGGER:-P1D":"TRIGGER:-PT15H","END:VALARM");
+    if(c.hora)L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(`En 1 hora: ${c.titulo||t.n} de ${nombre}`),"TRIGGER:-PT1H","END:VALARM");
+    L.push("END:VEVENT");
+  });
+  L.push("END:VCALENDAR");
+  const blob=new Blob([L.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=lista.length===1?"cita-aime.ics":"citas-aime.ics"; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},4000);
+  toast(lista.length===1?"Pulsa «Añadir» en tu calendario":`Pulsa «Añadir todo» (${lista.length} citas)`);
+}
+
 /* ---------- data ---------- */
 async function save(col,id,data,isDoc){
   if(!db){toast("Sin conexión con los datos");return}
@@ -854,6 +893,7 @@ document.querySelectorAll("#segSalud button").forEach(b=>b.onclick=()=>{S.segS=b
 $("#calPrev").onclick=()=>{S.calM--;if(S.calM<0){S.calM=11;S.calY--}render()};
 $("#calNext").onclick=()=>{S.calM++;if(S.calM>11){S.calM=0;S.calY++}render()};
 $("#editFicha").onclick=formFicha;
+$("#bCalTodas").onclick=()=>avisoCalendario(sortCitas(S.citas));
 $("#avatar").onclick=()=>{
   if(!S.canWrite) return;
   if(!S.foto) return $("#fotoInput").click();
