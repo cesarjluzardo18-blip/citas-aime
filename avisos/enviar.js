@@ -7,7 +7,7 @@ const db = admin.firestore();
 const URL_APP = "https://cesarjluzardo18-blip.github.io/citas-aime/";
 const ADMIN = "cesarjluzardo18@gmail.com";
 const TIPOS = { pediatra:["🩺","Pediatra"], vacuna:["💉","Vacuna"], especialista:["👩‍⚕️","Especialista"], dentista:["🦷","Dentista"],
-  guarderia:["🎒","Guardería"], natacion:["🏊‍♀️","Natación"], gimnasia:["🤸‍♀️","Gimnasia"], otro:["⭐","Otro"] };
+  guarderia:["🎒","Guardería"], natacion:["🏊‍♀️","Natación"], gimnasia:["🤸‍♀️","Gimnasio"], otro:["⭐","Otro"] };
 
 function offsetMadrid(ts) {
   const f = new Intl.DateTimeFormat("en-US", { timeZone:"Europe/Madrid", hourCycle:"h23", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });

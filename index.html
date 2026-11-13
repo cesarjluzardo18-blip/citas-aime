@@ -295,7 +295,7 @@ const TIPOS = {
   dentista:    {n:"Dentista",      e:"🦷", c:"#F7E3A8", t:"#8A6A12"},
   guarderia:   {n:"Guardería",     e:"🎒", c:"#F9C9B3", t:"#A55A3A"},
   natacion:    {n:"Natación",      e:"🏊‍♀️", c:"#A8E1E6", t:"#24777F"},
-  gimnasia:    {n:"Gimnasia",      e:"🤸‍♀️", c:"#DCC8F0", t:"#6B4C93"},
+  gimnasia:    {n:"Gimnasio",      e:"🤸‍♀️", c:"#DCC8F0", t:"#6B4C93"},
   otro:        {n:"Otro",          e:"⭐", c:"#F4C6D4", t:"#9A4865"}
 };
 const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -539,27 +539,72 @@ function formCita(c){
     <label>Quién la lleva</label><input id="fQui" value="${esc(c.quien||"")}">
     <label>Qué llevar / preguntar</label><textarea id="fNot">${esc(c.notas||"")}</textarea>
     <label>Qué dijeron / resultado</label><textarea id="fRes" placeholder="Para rellenar después de la cita">${esc(c.resultado||"")}</textarea>
-    ${isNew?`<div class="row2"><div><label>Se repite</label><select id="fRep"><option value="0">No</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option></select></div>
-      <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>`
+    ${isNew?`<div class="row2"><div><label>Se repite</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option></select></div>
+      <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
+      <div id="fDiasW" class="hidden"><label>Qué días y a qué hora</label>
+        <div class="types" id="fDias">${[[1,"L"],[2,"M"],[3,"X"],[4,"J"],[5,"V"],[6,"S"],[0,"D"]].map(([n,l])=>`<button type="button" data-d="${n}" style="background:#fff;width:42px;justify-content:center;padding:8px 0;border:2px solid var(--line)">${l}</button>`).join("")}</div>
+        <div id="fDiasHoras" style="margin-top:8px"></div></div>
+      <div id="fSueltasW" class="hidden"><label>Fechas y horas</label><div id="fSueltas"></div>
+        <button type="button" class="btn ghost" id="fAddFecha" style="margin-top:8px;padding:10px">＋ Añadir otra fecha</button></div>`
       : (c.serieId?`<div class="small" style="margin-top:12px">🔁 Esta cita se repite. Al guardar podrás elegir si cambiar solo esta o también las siguientes.</div>`:"")}
     <button class="btn primary" id="bSave">Guardar</button>
     ${isNew?`<button class="btn ghost" id="bCancel">Cancelar</button>`:`<button class="btn danger" id="bDel">Borrar cita</button>`}`);
-  if(isNew)$("#fRep").onchange=e=>$("#fHastaW").classList.toggle("hidden",e.target.value==="0");
+  const NOMDIA=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  const diasSel={}; // día de la semana -> hora
+  const pintaDias=()=>{
+    document.querySelectorAll("#fDias button").forEach(b=>{const on=b.dataset.d in diasSel;b.style.background=on?"var(--main)":"#fff";b.style.color=on?"#fff":"var(--ink)";b.style.borderColor=on?"var(--main)":"var(--line)";});
+    $("#fDiasHoras").innerHTML=[1,2,3,4,5,6,0].filter(n=>n in diasSel).map(n=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><b style="width:96px">${NOMDIA[n]}</b><input type="time" data-dh="${n}" value="${esc(diasSel[n]||"")}" style="flex:1"></div>`).join("");
+    document.querySelectorAll("[data-dh]").forEach(i=>i.oninput=()=>diasSel[i.dataset.dh]=i.value);
+  };
+  if(isNew){
+    const sueltas=[];
+    const pintaSueltas=()=>{
+      $("#fSueltas").innerHTML=sueltas.map((s,i)=>`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="date" data-sf="${i}" value="${esc(s.fecha)}" style="flex:1.4"><input type="time" data-sh="${i}" value="${esc(s.hora)}" style="flex:1"><button type="button" data-sx="${i}" style="font-size:18px;color:var(--muted);padding:4px 6px">✕</button></div>`).join("");
+      document.querySelectorAll("[data-sf]").forEach(x=>x.oninput=()=>sueltas[x.dataset.sf].fecha=x.value);
+      document.querySelectorAll("[data-sh]").forEach(x=>x.oninput=()=>sueltas[x.dataset.sh].hora=x.value);
+      document.querySelectorAll("[data-sx]").forEach(x=>x.onclick=()=>{sueltas.splice(+x.dataset.sx,1);pintaSueltas();});
+    };
+    S._sueltas=sueltas;
+    $("#fAddFecha").onclick=()=>{const u=sueltas[sueltas.length-1]; let f=""; if(u&&u.fecha){const d=parseD(u.fecha);d.setDate(d.getDate()+1);f=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+      sueltas.push({fecha:f,hora:(u&&u.hora)||$("#fHor").value}); pintaSueltas();};
+    $("#fRep").onchange=e=>{const v=e.target.value; $("#fSueltasW").classList.toggle("hidden",v!=="x");
+      if(v==="x"){ if(!sueltas.length){sueltas.push({fecha:$("#fFec").value,hora:$("#fHor").value});sueltas.push({fecha:"",hora:$("#fHor").value});} pintaSueltas(); }
+      const on=v==="7"||v==="14";$("#fHastaW").classList.toggle("hidden",!on);$("#fDiasW").classList.toggle("hidden",!on);
+      if(on&&!Object.keys(diasSel).length&&$("#fFec").value){diasSel[parseD($("#fFec").value).getDay()]=$("#fHor").value;} pintaDias();};
+    document.querySelectorAll("#fDias button").forEach(b=>b.onclick=()=>{const d=b.dataset.d; if(d in diasSel)delete diasSel[d]; else diasSel[d]=$("#fHor").value; pintaDias();});
+  }
   document.querySelectorAll("#fTipos button").forEach(b=>b.onclick=()=>{sel=b.dataset.k;document.querySelectorAll("#fTipos button").forEach(x=>x.classList.toggle("on",x===b))});
   if(isNew)$("#bCancel").onclick=closeSheet;
   else $("#bDel").onclick=()=>c.serieId?elegirSerie("borrar",c,null):confirmDel("esta cita",()=>del("citas",c.id));
   $("#bSave").onclick=async()=>{
     const data={tipo:sel,titulo:$("#fTit").value.trim(),fecha:$("#fFec").value,hora:$("#fHor").value,lugar:$("#fLug").value.trim(),quien:$("#fQui").value.trim(),notas:$("#fNot").value.trim(),resultado:$("#fRes").value.trim()};
+    if(isNew&&$("#fRep").value==="x"){
+      const fs=(S._sueltas||[]).filter(s=>s.fecha).sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+      if(!fs.length){toast("Añade al menos una fecha");return}
+      const serieId=fs.length>1?"s"+Date.now().toString(36):null;
+      toast(`Creando ${fs.length} citas…`);
+      try{ for(const f of fs){ const d={...data,fecha:f.fecha,hora:f.hora||"",actualizado:new Date().toISOString()}; if(serieId)d.serieId=serieId; await db.collection("citas").add(d); }
+        closeSheet(); toast(`✓ ${fs.length} citas creadas`); }catch(e){ handleWriteErr(e); }
+      return;
+    }
     if(!data.fecha){toast("Pon una fecha");return}
     if(isNew){
       const cada=+$("#fRep").value;
       if(cada){
         const hasta=$("#fHasta").value; if(!hasta||hasta<data.fecha){toast("Revisa la fecha «Hasta»");return}
-        const fechas=[]; const d=parseD(data.fecha);
-        while(fechas.length<60){ const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; if(s>hasta)break; fechas.push(s); d.setDate(d.getDate()+cada); }
+        const dias=Object.keys(diasSel).map(Number); if(!dias.length){toast("Elige al menos un día");return}
+        const fechas=[]; const d=parseD(data.fecha); const ini=parseD(data.fecha);
+        const lunesIni=new Date(ini); lunesIni.setDate(ini.getDate()-((ini.getDay()+6)%7));
+        while(fechas.length<120){
+          const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; if(s>hasta)break;
+          const semana=Math.floor(Math.round((d-lunesIni)/864e5)/7);
+          if(dias.includes(d.getDay()) && (cada===7 || semana%2===0)) fechas.push({fecha:s,hora:diasSel[d.getDay()]||data.hora});
+          d.setDate(d.getDate()+1);
+        }
+        if(!fechas.length){toast("No sale ninguna fecha con esos días");return}
         const serieId="s"+Date.now().toString(36);
         toast(`Creando ${fechas.length} citas…`);
-        try{ for(const f of fechas) await db.collection("citas").add({...data,fecha:f,serieId,actualizado:new Date().toISOString()});
+        try{ for(const f of fechas) await db.collection("citas").add({...data,fecha:f.fecha,hora:f.hora,serieId,actualizado:new Date().toISOString()});
           closeSheet(); toast(`✓ ${fechas.length} citas creadas`); }catch(e){ handleWriteErr(e); }
         return;
       }
@@ -827,6 +872,7 @@ function elegirSerie(accion,c,data){
         if(accion==="borrar") await db.doc("citas/"+x.id).delete();
         else{ const {fecha,resultado,...comun}=data;
           const nuevo={...x,...comun,serieId:c.serieId,actualizado:new Date().toISOString()};
+          if(data.hora===c.hora || x.hora!==c.hora) nuevo.hora=x.hora; // si cambias la hora, solo cambia en los días que tenían la misma hora
           if(x.id===c.id){ nuevo.fecha=fecha; nuevo.resultado=resultado; }
           delete nuevo.id; await db.doc("citas/"+x.id).set(nuevo); }
       }
