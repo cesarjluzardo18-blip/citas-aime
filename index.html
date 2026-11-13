@@ -1049,7 +1049,7 @@ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==
 $("#zonaSave").onclick=async()=>{ try{ await db.doc("config/general").set({...(S.general||{}),zona:$("#zonaSel").value,actualizado:new Date().toISOString()}); toast("Zona guardada ✓"); }catch(e){ handleWriteErr(e); } };
 function renderMsgCfg(){
   $("#zonaWrap").classList.toggle("hidden",!S.gestiona);
-  $("#msgCfgWrap").classList.toggle("hidden",!S.gestiona); if(!S.gestiona)return;
+  $("#msgCfgWrap").classList.toggle("hidden",!S.isAdmin); if(!S.isAdmin)return;
   const c=S.msgCfg||{}; const quien=new Set(c.destinatarios||[]);
   if(!S._msgCfgTocado){ $("#msgOn").checked=!!c.activo; $("#msgHora").value=c.hora||"09:00"; $("#msgPara").value=c.para||"Keyla"; $("#msgDe").value=c.de||"César"; }
   const us=S.usuarios.filter(u=>["ver","editar"].includes(u.rol)||(u.email||"").toLowerCase()===ADMIN);

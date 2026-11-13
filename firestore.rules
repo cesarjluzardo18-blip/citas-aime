@@ -28,7 +28,8 @@ service cloud.firestore {
     // Datos de Aime: todo lo demás (citas, salud, hitos, listas…)
     match /{col}/{id} {
       allow read: if !(col in ["usuarios", "tokens", "avisos_enviados"]) && puedeVer();
-      allow write: if !(col in ["usuarios", "tokens", "avisos_enviados"]) && puedeEditar();
+      allow write: if !(col in ["usuarios", "tokens", "avisos_enviados"]) && puedeEditar()
+        && !(col == "config" && id == "mensaje" && !esAdmin()); // el mensaje del día solo lo configura el administrador
     }
   }
 }
