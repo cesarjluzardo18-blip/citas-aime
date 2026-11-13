@@ -175,6 +175,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     <div class="card" id="relojBox" style="text-align:center;padding:14px 16px;background:linear-gradient(135deg,#FFFFFF,#FFF3EC)">
       <div id="relojHora" style="font-family:Fredoka;font-size:44px;line-height:1.1;color:var(--ink)"></div>
       <div id="relojFecha" class="small" style="font-size:14px"></div>
+      <div id="relojAime" class="small hidden" style="margin-top:6px;color:var(--main-dark);font-weight:700"></div>
     </div>
     <div class="card hidden" id="fraseBox" style="background:#FDF0F4;border-left:5px solid #F4C6D4">
       <div class="small" style="font-weight:700;color:#9A4865;text-transform:uppercase;letter-spacing:.04em">💌 Frase del día</div>
@@ -238,6 +239,12 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <div class="small" id="activosTx" style="margin:-4px 4px 8px;color:#2F7A57;font-weight:700"></div>
       <div class="card" id="personasBox"></div>
       <div class="small hidden" id="rolesHelp" style="margin:0 4px 8px">«Solo ver»: ve todo pero no cambia nada. «Puede editar»: añade y cambia citas y también aprueba a otras personas. «Sin acceso»: no puede entrar.</div>
+    </div>
+    <div id="zonaWrap" class="hidden">
+      <div class="section-title"><h2>🌍 Zona horaria de Aime</h2></div>
+      <div class="card"><div class="small">Las horas de las citas, los avisos y el mensaje del día van con la hora del sitio donde vive Aime.</div>
+        <select id="zonaSel" style="margin-top:10px"><option value="Europe/Madrid">España</option><option value="America/New_York">EE. UU. – Este (Nueva York, Florida…)</option><option value="America/Chicago">EE. UU. – Centro (Texas, Chicago…)</option><option value="America/Denver">EE. UU. – Montaña (Colorado, Utah…)</option><option value="America/Phoenix">EE. UU. – Arizona</option><option value="America/Los_Angeles">EE. UU. – Pacífico (California…)</option><option value="America/Anchorage">EE. UU. – Alaska</option><option value="Pacific/Honolulu">EE. UU. – Hawái</option><option value="America/Puerto_Rico">Puerto Rico</option></select>
+        <button class="btn primary" id="zonaSave" type="button">Guardar</button></div>
     </div>
     <div id="msgCfgWrap" class="hidden">
       <div class="section-title"><h2>💌 Mensaje del día</h2></div>
@@ -554,7 +561,7 @@ function formCita(c){
     <div class="types" id="fTipos">${Object.entries(TIPOS).map(([k,t])=>`<button type="button" data-k="${k}" class="${k===sel?"on":""}" style="background:${t.c};color:${t.t}">${t.e} ${t.n}</button>`).join("")}</div>
     <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
     <div class="row2" id="fFecRow"><div><label id="fFecLbl">Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
-    <div id="fHorW"><label>Hora</label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div>
+    <div id="fHorW"><label>Hora <span id="fHorZona" style="text-transform:none;letter-spacing:0;font-weight:600"></span></label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div>
     <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
     ${isNew?`<div><label>¿Se repite?</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option></select></div>
       <div id="fDiasW" class="hidden"><label>Qué días y a qué hora</label>
@@ -569,6 +576,7 @@ function formCita(c){
     ${isNew?"":(c.serieId?`<div class="small" style="margin-top:12px">🔁 Esta cita se repite. Al guardar podrás elegir si cambiar solo esta o también las siguientes.</div>`:"")}
     <button class="btn primary" id="bSave">Guardar</button>
     ${isNew?`<button class="btn ghost" id="bCancel">Cancelar</button>`:`<button class="btn danger" id="bDel">Borrar cita</button>`}`);
+  try{ const miZ=Intl.DateTimeFormat().resolvedOptions().timeZone; if(miZ!==zonaAime()) $("#fHorZona").textContent=`(hora de ${ZONA_NOMBRE[zonaAime()]||zonaAime()})`; }catch(e){}
   const NOMDIA=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const diasSel={}; // día de la semana -> hora
   const pintaDias=()=>{
@@ -855,7 +863,8 @@ function avisoCalendario(lista){
     L.push("BEGIN:VEVENT","UID:"+c.id+"@citas-aime","DTSTAMP:"+now);
     if(c.hora){
       const [hh,mm]=c.hora.split(":").map(Number); const fin=new Date(2000,0,1,hh+1,mm);
-      L.push("DTSTART:"+d+"T"+pad(hh)+pad(mm)+"00","DTEND:"+(hh>=23?d:d)+"T"+pad(hh>=23?23:fin.getHours())+pad(hh>=23?59:fin.getMinutes())+"00");
+      const tz=";TZID="+zonaAime();
+      L.push("DTSTART"+tz+":"+d+"T"+pad(hh)+pad(mm)+"00","DTEND"+tz+":"+d+"T"+pad(hh>=23?23:fin.getHours())+pad(hh>=23?59:fin.getMinutes())+"00");
     }else{
       const n=parseD(c.fecha); n.setDate(n.getDate()+1);
       L.push("DTSTART;VALUE=DATE:"+d,"DTEND;VALUE=DATE:"+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate()));
@@ -1015,6 +1024,14 @@ function tickReloj(){ const d=new Date(); if(!$("#relojHora"))return;
   $("#relojHora").textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
   $("#relojFecha").textContent=`${DIAS[d.getDay()].replace(/^./,x=>x.toUpperCase())} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`; }
 setInterval(tickReloj,1000*15); tickReloj();
+const ZONA_NOMBRE={"Europe/Madrid":"España","America/New_York":"EE. UU.","America/Chicago":"EE. UU.","America/Denver":"EE. UU.","America/Phoenix":"EE. UU.","America/Los_Angeles":"EE. UU.","America/Anchorage":"EE. UU.","Pacific/Honolulu":"Hawái","America/Puerto_Rico":"Puerto Rico"};
+function zonaAime(){ return (S.general&&S.general.zona)||"Europe/Madrid"; }
+function tickAime(){ const el=$("#relojAime"); if(!el)return; let miZona=""; try{miZona=Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){}
+  const z=zonaAime(); const f=new Intl.DateTimeFormat("es-ES",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());
+  const yo=new Intl.DateTimeFormat("es-ES",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());
+  const distinta=miZona&&miZona!==z&&f!==yo; el.classList.toggle("hidden",!distinta);
+  if(distinta) el.textContent=`🏠 En casa de Aime (${ZONA_NOMBRE[z]||z}): ${f}`; }
+setInterval(tickAime,1000*15);
 let FRASES=[];
 function numDia(){ const d=new Date(); return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(2026,0,1))/864e5); }
 fetch("mensajes.json").then(r=>r.json()).then(j=>{FRASES=j.mensajes||[];pintarFrase();}).catch(()=>{});
@@ -1023,7 +1040,9 @@ function pintarFrase(){ if(!FRASES.length||!$("#fraseBox"))return; const i=((num
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){tickReloj();pintarFrase();} });
 
 /* ---------- configuración del mensaje diario ---------- */
+$("#zonaSave").onclick=async()=>{ try{ await db.doc("config/general").set({...(S.general||{}),zona:$("#zonaSel").value,actualizado:new Date().toISOString()}); toast("Zona guardada ✓"); }catch(e){ handleWriteErr(e); } };
 function renderMsgCfg(){
+  $("#zonaWrap").classList.toggle("hidden",!S.gestiona);
   $("#msgCfgWrap").classList.toggle("hidden",!S.gestiona); if(!S.gestiona)return;
   const c=S.msgCfg||{}; const quien=new Set(c.destinatarios||[]);
   if(!S._msgCfgTocado){ $("#msgOn").checked=!!c.activo; $("#msgHora").value=c.hora||"09:00"; }
@@ -1187,6 +1206,7 @@ function startApp(){
   status("Cargando…");
   const timer=setTimeout(()=>status("No se pueden cargar los datos ahora mismo. Revisa la conexión."),10000);
   unsubs.push(db.doc("ficha/aime").onSnapshot(s=>{S.ficha=s.exists?s.data():{};render();},()=>{}));
+  unsubs.push(db.doc("config/general").onSnapshot(s=>{S.general=s.exists?s.data():{};$("#zonaSel").value=zonaAime();tickAime();},()=>{}));
   unsubs.push(db.doc("config/mensaje").onSnapshot(s=>{S.msgCfg=s.exists?s.data():{};renderMsgCfg();},()=>{}));
   unsubs.push(db.doc("ficha/foto").onSnapshot(s=>{S.foto=s.exists?(s.data().img||""):"";renderHeader();},()=>{}));
 

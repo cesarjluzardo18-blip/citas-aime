@@ -9,8 +9,9 @@ const ADMIN = "cesarjluzardo18@gmail.com";
 const TIPOS = { pediatra:["🩺","Pediatra"], vacuna:["💉","Vacuna"], especialista:["👩‍⚕️","Especialista"], dentista:["🦷","Dentista"],
   guarderia:["🎒","Guardería"], natacion:["🏊‍♀️","Natación"], gimnasia:["🤸‍♀️","Gimnasio"], otro:["⭐","Otro"] };
 
+let ZONA = "Europe/Madrid"; // se cambia con config/general.zona
 function offsetMadrid(ts) {
-  const f = new Intl.DateTimeFormat("en-US", { timeZone:"Europe/Madrid", hourCycle:"h23", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  const f = new Intl.DateTimeFormat("en-US", { timeZone:ZONA, hourCycle:"h23", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
   const p = Object.fromEntries(f.formatToParts(new Date(ts)).map(x => [x.type, x.value]));
   return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - ts;
 }
@@ -24,7 +25,8 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
 
 (async () => {
   const ahora = Date.now();
-  const [cfgS] = await Promise.all([db.doc("config/mensaje").get()]);
+  const [cfgS, genS] = await Promise.all([db.doc("config/mensaje").get(), db.doc("config/general").get()]);
+  if (genS.exists && genS.data().zona) ZONA = genS.data().zona;
   const [citasS, usersS, tokensS, fichaS, vacS, medS] = await Promise.all([
     db.collection("citas").get(), db.collection("usuarios").get(), db.collection("tokens").get(), db.doc("ficha/aime").get(),
     db.collection("vacunas").get(), db.collection("medicamentos").get()]);
@@ -78,7 +80,7 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
   // Mensaje motivador del día (solo a las personas elegidas)
   const cfg = cfgS.exists ? cfgS.data() : {};
   if (cfg.activo && (cfg.destinatarios || []).length) {
-    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(ahora));
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: ZONA }).format(new Date(ahora));
     if (ahora >= madrid(hoy, cfg.hora || "09:00") && ahora < madrid(hoy, "23:59")) {
       const frases = require("../mensajes.json").mensajes;
       const [y, m, d] = hoy.split("-").map(Number);
