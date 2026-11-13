@@ -92,6 +92,8 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 .sheet .x{float:right;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:var(--shadow);font-size:18px}
 .sheet h2{font-size:20px;margin-bottom:4px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2>div{min-width:0}
+.row2 input{min-width:0}
 .btn{display:block;width:100%;padding:14px;border-radius:14px;font-weight:700;font-size:16px;text-align:center;margin-top:16px}
 .btn.primary{background:var(--main);color:#fff}
 .btn.ghost{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
@@ -532,21 +534,21 @@ function formCita(c){
   openSheet(`<h2>${isNew?"Nueva cita":"Editar cita"}</h2>
     <label>Tipo</label>
     <div class="types" id="fTipos">${Object.entries(TIPOS).map(([k,t])=>`<button type="button" data-k="${k}" class="${k===sel?"on":""}" style="background:${t.c};color:${t.t}">${t.e} ${t.n}</button>`).join("")}</div>
-    <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
-    <div class="row2"><div><label>Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
-    <div><label>Hora</label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div></div>
-    <label>Lugar</label><input id="fLug" placeholder="Centro de salud, piscina…" value="${esc(c.lugar||"")}">
-    <label>Quién la lleva</label><input id="fQui" value="${esc(c.quien||"")}">
-    <label>Qué llevar / preguntar</label><textarea id="fNot">${esc(c.notas||"")}</textarea>
-    <label>Qué dijeron / resultado</label><textarea id="fRes" placeholder="Para rellenar después de la cita">${esc(c.resultado||"")}</textarea>
-    ${isNew?`<div class="row2"><div><label>Se repite</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option></select></div>
-      <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
+    ${isNew?`<div><label>¿Se repite?</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option></select></div>
+      <div id="fHastaW" class="row2 hidden"><div><label>Desde</label><input id="fDesde" type="date" value="${esc(c.fecha||todayStr())}"></div><div><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
       <div id="fDiasW" class="hidden"><label>Qué días y a qué hora</label>
         <div class="types" id="fDias">${[[1,"L"],[2,"M"],[3,"X"],[4,"J"],[5,"V"],[6,"S"],[0,"D"]].map(([n,l])=>`<button type="button" data-d="${n}" style="background:#fff;width:42px;justify-content:center;padding:8px 0;border:2px solid var(--line)">${l}</button>`).join("")}</div>
         <div id="fDiasHoras" style="margin-top:8px"></div></div>
       <div id="fSueltasW" class="hidden"><label>Fechas y horas</label><div id="fSueltas"></div>
-        <button type="button" class="btn ghost" id="fAddFecha" style="margin-top:8px;padding:10px">＋ Añadir otra fecha</button></div>`
-      : (c.serieId?`<div class="small" style="margin-top:12px">🔁 Esta cita se repite. Al guardar podrás elegir si cambiar solo esta o también las siguientes.</div>`:"")}
+        <button type="button" class="btn ghost" id="fAddFecha" style="margin-top:8px;padding:10px">＋ Añadir otra fecha</button></div>`:""}
+    <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
+    <div class="row2" id="fFecRow"><div><label id="fFecLbl">Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
+    <div id="fHorW"><label>Hora</label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div></div>
+    <label>Lugar</label><input id="fLug" placeholder="Centro de salud, piscina…" value="${esc(c.lugar||"")}">
+    <label>Quién la lleva</label><input id="fQui" value="${esc(c.quien||"")}">
+    <label>Qué llevar / preguntar</label><textarea id="fNot">${esc(c.notas||"")}</textarea>
+    <label>Qué dijeron / resultado</label><textarea id="fRes" placeholder="Para rellenar después de la cita">${esc(c.resultado||"")}</textarea>
+    ${isNew?"":(c.serieId?`<div class="small" style="margin-top:12px">🔁 Esta cita se repite. Al guardar podrás elegir si cambiar solo esta o también las siguientes.</div>`:"")}
     <button class="btn primary" id="bSave">Guardar</button>
     ${isNew?`<button class="btn ghost" id="bCancel">Cancelar</button>`:`<button class="btn danger" id="bDel">Borrar cita</button>`}`);
   const NOMDIA=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -569,8 +571,9 @@ function formCita(c){
       sueltas.push({fecha:f,hora:(u&&u.hora)||$("#fHor").value}); pintaSueltas();};
     $("#fRep").onchange=e=>{const v=e.target.value; $("#fSueltasW").classList.toggle("hidden",v!=="x");
       if(v==="x"){ if(!sueltas.length){sueltas.push({fecha:$("#fFec").value,hora:$("#fHor").value});sueltas.push({fecha:"",hora:$("#fHor").value});} pintaSueltas(); }
-      const on=v==="7"||v==="14";$("#fHastaW").classList.toggle("hidden",!on);$("#fDiasW").classList.toggle("hidden",!on);
-      if(on&&!Object.keys(diasSel).length&&$("#fFec").value){diasSel[parseD($("#fFec").value).getDay()]=$("#fHor").value;} pintaDias();};
+      const on=v==="7";$("#fHastaW").classList.toggle("hidden",!on);$("#fDiasW").classList.toggle("hidden",!on);
+      $("#fFecRow").classList.toggle("hidden",v!=="0");
+      if(on&&!Object.keys(diasSel).length&&$("#fDesde").value){diasSel[parseD($("#fDesde").value).getDay()]=$("#fHor").value;} pintaDias();};
     document.querySelectorAll("#fDias button").forEach(b=>b.onclick=()=>{const d=b.dataset.d; if(d in diasSel)delete diasSel[d]; else diasSel[d]=$("#fHor").value; pintaDias();});
   }
   document.querySelectorAll("#fTipos button").forEach(b=>b.onclick=()=>{sel=b.dataset.k;document.querySelectorAll("#fTipos button").forEach(x=>x.classList.toggle("on",x===b))});
@@ -587,10 +590,11 @@ function formCita(c){
         closeSheet(); toast(`✓ ${fs.length} citas creadas`); }catch(e){ handleWriteErr(e); }
       return;
     }
-    if(!data.fecha){toast("Pon una fecha");return}
+    if(!data.fecha&&!(isNew&&$("#fRep").value==="7")){toast("Pon una fecha");return}
     if(isNew){
       const cada=+$("#fRep").value;
       if(cada){
+        data.fecha=$("#fDesde").value; if(!data.fecha){toast("Pon la fecha «Desde»");return}
         const hasta=$("#fHasta").value; if(!hasta||hasta<data.fecha){toast("Revisa la fecha «Hasta»");return}
         const dias=Object.keys(diasSel).map(Number); if(!dias.length){toast("Elige al menos un día");return}
         const fechas=[]; const d=parseD(data.fecha); const ini=parseD(data.fecha);
