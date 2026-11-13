@@ -78,7 +78,7 @@ header.top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 /* nav */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 0 calc(var(--safe-b) + 6px);z-index:20}
 nav.tabs .in{display:flex;max-width:560px;width:100%}
-nav.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted);padding:6px 0}
+nav.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;font-weight:700;color:var(--muted);padding:6px 0}
 nav.tabs button .ic{font-size:22px;filter:grayscale(1);opacity:.6}
 nav.tabs button.on{color:var(--main-dark)}
 nav.tabs button.on .ic{filter:none;opacity:1}
@@ -197,6 +197,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 
   <!-- SALUD -->
   <section id="v-salud" class="hidden">
+    <button class="btn ghost bResumen" type="button" style="margin:0 0 12px">🩺 Resumen para el médico</button>
     <div class="seg four" id="segSalud">
       <button class="on" data-s="vac">Vacunas</button>
       <button data-s="med">Medidas</button>
@@ -209,10 +210,17 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     <div id="saludRx" class="hidden"></div>
   </section>
 
+  <!-- HITOS -->
+  <section id="v-hitos" class="hidden">
+    <div class="section-title"><h2>Momentos de Aime</h2></div>
+    <div id="hitosList"></div>
+  </section>
+
   <!-- FICHA -->
   <section id="v-ficha" class="hidden">
     <div class="section-title"><h2>Ficha de Aime</h2><button class="chip editOnly" style="background:var(--main-soft);color:var(--main-dark)" id="editFicha">Editar</button></div>
     <div class="card" id="fichaBox"></div>
+    <button class="btn primary bResumen" type="button" style="margin:0 0 4px;background:#8ACBA8">🩺 Resumen para el médico</button>
     <div class="section-title"><h2>Contactos</h2><button class="chip editOnly" style="background:var(--main-soft);color:var(--main-dark)" id="addContacto">+ Añadir</button></div>
     <div class="card" id="contactosBox"></div>
     <div id="personasWrap" class="hidden">
@@ -225,6 +233,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     <div class="card"><div class="small" id="yoBox"></div>
       <div class="small" id="notiEstado" style="margin-top:10px"></div>
       <button class="btn primary hidden bNoti" type="button" style="background:#7FA6DA">🔔 Activar avisos en este móvil</button>
+      <button class="btn ghost hidden" id="bBackup" type="button">💾 Descargar copia de seguridad</button>
       <button class="btn ghost bSalir" type="button">Cerrar sesión</button></div>
   </section>
   </div>
@@ -236,6 +245,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
   <button class="on" data-v="inicio"><span class="ic">🏠</span>Inicio</button>
   <button data-v="cal"><span class="ic">📅</span>Calendario</button>
   <button data-v="salud"><span class="ic">💉</span>Salud</button>
+  <button data-v="hitos"><span class="ic">⭐</span>Hitos</button>
   <button data-v="ficha"><span class="ic">🧸</span>Ficha</button>
 </div></nav>
 
@@ -269,6 +279,7 @@ const db = {
   collection: c => ({
     onSnapshot: (cb,err) => onSnapshot(collection(fdb,c), s => cb({docs:s.docs.map(wrap), metadata:s.metadata}), err),
     add: d => addDoc(collection(fdb,c), d),
+    get: async () => { const s = await getDocs(collection(fdb,c)); return {docs:s.docs.map(wrap)}; },
     where: (f,o,v) => ({ get: async () => { const s = await getDocs(query(collection(fdb,c), where(f,o,v))); return {docs:s.docs.map(wrap)}; } })
   }),
   doc: p => ({
@@ -290,7 +301,7 @@ const TIPOS = {
 const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 
-const S = { usuarios:[], uid:null, email:"", nombre:"", isAdmin:false, citas:[], vacunas:[], medidas:[], contactos:[], fiebre:[], medicamentos:[], ficha:{}, canWrite:true, view:"inicio", segC:"prox", segS:"vac",
+const S = { usuarios:[], uid:null, email:"", nombre:"", isAdmin:false, citas:[], vacunas:[], medidas:[], contactos:[], fiebre:[], medicamentos:[], hitos:[], listas:{}, ficha:{}, canWrite:true, view:"inicio", segC:"prox", segS:"vac",
   calY:new Date().getFullYear(), calM:new Date().getMonth(), selDay:null };
 
 /* ---------- helpers ---------- */
@@ -313,7 +324,7 @@ const sortCitas=a=>a.slice().sort((x,y)=>(x.fecha+(x.hora||"99")).localeCompare(
 /* ---------- views ---------- */
 function setView(v){
   S.view=v;
-  ["inicio","cal","salud","ficha"].forEach(k=>$("#v-"+k).classList.toggle("hidden",k!==v));
+  ["inicio","cal","salud","hitos","ficha"].forEach(k=>$("#v-"+k).classList.toggle("hidden",k!==v));
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
   updateFab(); render(); window.scrollTo(0,0);
 }
@@ -325,7 +336,7 @@ function citaHTML(c){
     <div class="bar" style="background:${t.c}"></div>
     <div class="body">
       <div class="t">${t.e} ${esc(c.titulo||t.n)}</div>
-      <div class="m">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(c.hora)}`:""}</div>
+      <div class="m">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(c.hora)}`:""}${c.serieId?" · 🔁":""}</div>
       ${c.lugar?`<div class="m">📍 ${esc(c.lugar)}</div>`:""}
     </div>
     <div class="right">
@@ -473,6 +484,7 @@ function render(){
   if(S.view==="cal")renderCal();
   if(S.view==="salud")renderSalud();
   if(S.view==="ficha")renderFicha();
+  if(S.view==="hitos")renderHitos();
 }
 
 /* ---------- sheets ---------- */
@@ -490,6 +502,7 @@ function showCita(id){
       ${r("Lugar",c.lugar)}${r("Quién la lleva",c.quien)}${r("Qué llevar / preguntar",c.notas)}${r("Qué dijeron / resultado",c.resultado)}
       ${!c.lugar&&!c.quien&&!c.notas&&!c.resultado?'<div class="small">Sin más detalles.</div>':""}
     </div>
+    <div class="card" id="listaBox"></div>
     <div class="card"><div class="k small" style="font-weight:700;text-transform:uppercase;letter-spacing:.04em">📎 Informes y recetas</div>
       <div class="thumbs" id="thumbs"><div class="small" style="grid-column:1/-1">Cargando…</div></div>
       <input type="file" id="docInput" accept="image/*" multiple class="hidden">
@@ -501,6 +514,7 @@ function showCita(id){
   if(S.canWrite)$("#bEdit").onclick=()=>formCita(c);
   if($("#bCal"))$("#bCal").onclick=()=>avisoCalendario([c]);
   cargarFotos(c.id);
+  pintarLista(c.tipo||"otro");
   $("#docInput").onchange=async e=>{
     const files=[...(e.target.files||[])]; e.target.value=""; if(!files.length)return;
     toast("Guardando…");
@@ -525,14 +539,32 @@ function formCita(c){
     <label>Quién la lleva</label><input id="fQui" value="${esc(c.quien||"")}">
     <label>Qué llevar / preguntar</label><textarea id="fNot">${esc(c.notas||"")}</textarea>
     <label>Qué dijeron / resultado</label><textarea id="fRes" placeholder="Para rellenar después de la cita">${esc(c.resultado||"")}</textarea>
+    ${isNew?`<div class="row2"><div><label>Se repite</label><select id="fRep"><option value="0">No</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option></select></div>
+      <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>`
+      : (c.serieId?`<div class="small" style="margin-top:12px">🔁 Esta cita se repite. Al guardar podrás elegir si cambiar solo esta o también las siguientes.</div>`:"")}
     <button class="btn primary" id="bSave">Guardar</button>
     ${isNew?`<button class="btn ghost" id="bCancel">Cancelar</button>`:`<button class="btn danger" id="bDel">Borrar cita</button>`}`);
+  if(isNew)$("#fRep").onchange=e=>$("#fHastaW").classList.toggle("hidden",e.target.value==="0");
   document.querySelectorAll("#fTipos button").forEach(b=>b.onclick=()=>{sel=b.dataset.k;document.querySelectorAll("#fTipos button").forEach(x=>x.classList.toggle("on",x===b))});
   if(isNew)$("#bCancel").onclick=closeSheet;
-  else $("#bDel").onclick=()=>confirmDel("esta cita",()=>del("citas",c.id));
+  else $("#bDel").onclick=()=>c.serieId?elegirSerie("borrar",c,null):confirmDel("esta cita",()=>del("citas",c.id));
   $("#bSave").onclick=async()=>{
     const data={tipo:sel,titulo:$("#fTit").value.trim(),fecha:$("#fFec").value,hora:$("#fHor").value,lugar:$("#fLug").value.trim(),quien:$("#fQui").value.trim(),notas:$("#fNot").value.trim(),resultado:$("#fRes").value.trim()};
     if(!data.fecha){toast("Pon una fecha");return}
+    if(isNew){
+      const cada=+$("#fRep").value;
+      if(cada){
+        const hasta=$("#fHasta").value; if(!hasta||hasta<data.fecha){toast("Revisa la fecha «Hasta»");return}
+        const fechas=[]; const d=parseD(data.fecha);
+        while(fechas.length<60){ const s=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; if(s>hasta)break; fechas.push(s); d.setDate(d.getDate()+cada); }
+        const serieId="s"+Date.now().toString(36);
+        toast(`Creando ${fechas.length} citas…`);
+        try{ for(const f of fechas) await db.collection("citas").add({...data,fecha:f,serieId,actualizado:new Date().toISOString()});
+          closeSheet(); toast(`✓ ${fechas.length} citas creadas`); }catch(e){ handleWriteErr(e); }
+        return;
+      }
+    }
+    if(!isNew&&c.serieId) return elegirSerie("cambiar",c,data);
     await save("citas",isNew?null:c.id,data);
   };
 }
@@ -778,6 +810,138 @@ function avisoCalendario(lista){
   toast(lista.length===1?"Pulsa «Añadir» en tu calendario":`Pulsa «Añadir todo» (${lista.length} citas)`);
 }
 
+/* ---------- series de citas ---------- */
+function elegirSerie(accion,c,data){
+  const sig=S.citas.filter(x=>x.serieId===c.serieId&&x.fecha>=c.fecha);
+  openSheet(`<h2>${accion==="borrar"?"Borrar cita que se repite":"Cambiar cita que se repite"}</h2>
+    <p class="small">Esta cita es parte de una serie (${sig.length} desde esta fecha).</p>
+    <button class="btn primary" id="bSolo">Solo esta</button>
+    <button class="btn ghost" id="bTodas">Esta y las siguientes (${sig.length})</button>
+    <button class="btn ghost" id="bNo">Cancelar</button>`);
+  $("#bNo").onclick=closeSheet;
+  $("#bSolo").onclick=async()=>{ if(accion==="borrar") await del("citas",c.id); else await save("citas",c.id,{...data,serieId:c.serieId}); };
+  $("#bTodas").onclick=async()=>{
+    try{
+      toast("Guardando…");
+      for(const x of sig){
+        if(accion==="borrar") await db.doc("citas/"+x.id).delete();
+        else{ const {fecha,resultado,...comun}=data;
+          const nuevo={...x,...comun,serieId:c.serieId,actualizado:new Date().toISOString()};
+          if(x.id===c.id){ nuevo.fecha=fecha; nuevo.resultado=resultado; }
+          delete nuevo.id; await db.doc("citas/"+x.id).set(nuevo); }
+      }
+      closeSheet(); toast(accion==="borrar"?"Borradas ✓":"Cambiadas ✓");
+    }catch(e){ handleWriteErr(e); }
+  };
+}
+
+/* ---------- listas de qué llevar ---------- */
+function listenListas(){
+  return new Promise(res=>{
+    const un=db.collection("listas").onSnapshot(s=>{ const o={}; s.docs.forEach(d=>o[d.id]=d.data()); S.listas=o; res(); if($("#listaBox")&&$("#listaBox").dataset.tipo)pintarLista($("#listaBox").dataset.tipo); },()=>res());
+    unsubs.push(un);
+  });
+}
+function pintarLista(tp){
+  const box=$("#listaBox"); if(!box)return; box.dataset.tipo=tp;
+  const items=((S.listas[tp]||{}).items)||[];
+  if(!items.length&&!S.canWrite){ box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const hechos=items.filter(i=>i.hecho).length;
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><div class="k small" style="font-weight:700;text-transform:uppercase;letter-spacing:.04em">🎒 Qué llevar · ${esc(tipo(tp).n)}</div>${items.length?`<span class="small">${hechos}/${items.length}</span>`:""}</div>
+    ${items.map((it,i)=>`<div class="list-item" style="padding:8px 0">
+      <button class="check ${it.hecho?"on":""}" data-li="${i}" ${S.canWrite?"":"disabled"}>${it.hecho?"✓":""}</button>
+      <span class="tx" style="${it.hecho?"text-decoration:line-through;color:var(--muted)":""}">${esc(it.t)}</span>
+      ${S.canWrite?`<button data-lx="${i}" style="color:var(--muted);font-size:18px;padding:4px 8px">✕</button>`:""}</div>`).join("")}
+    ${!items.length?`<div class="small" style="margin:8px 0">Crea la lista una vez y servirá para todas las citas de ${esc(tipo(tp).n.toLowerCase())}.</div>`:""}
+    ${S.canWrite?`<div style="display:flex;gap:8px;margin-top:8px"><input id="liNew" placeholder="Añadir (bañador, toalla…)"><button class="chip" id="liAdd" style="background:var(--main-soft);color:var(--main-dark);padding:0 14px">Añadir</button></div>
+      ${hechos?`<button class="small" id="liReset" style="margin-top:10px;text-decoration:underline">Desmarcar todo</button>`:""}`:""}`;
+  const guardar=async nuevos=>{ try{ await db.doc("listas/"+tp).set({items:nuevos,actualizado:new Date().toISOString()}); }catch(e){ handleWriteErr(e); } };
+  box.querySelectorAll("[data-li]").forEach(b=>b.onclick=()=>{ const n=items.map(x=>({...x})); n[+b.dataset.li].hecho=!n[+b.dataset.li].hecho; guardar(n); });
+  box.querySelectorAll("[data-lx]").forEach(b=>b.onclick=()=>{ const n=items.filter((_,i)=>i!==+b.dataset.lx); guardar(n); });
+  const add=()=>{ const v=$("#liNew").value.trim(); if(!v)return; guardar([...items.map(x=>({...x})),{t:v,hecho:false}]); };
+  if($("#liAdd")){ $("#liAdd").onclick=add; $("#liNew").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add()}}; }
+  if($("#liReset")) $("#liReset").onclick=()=>guardar(items.map(x=>({t:x.t,hecho:false})));
+}
+
+/* ---------- hitos ---------- */
+function edadEn(fecha){ const n=S.ficha&&S.ficha.nacimiento; if(!n||!fecha)return ""; const b=parseD(n),t=parseD(fecha);
+  let m=(t.getFullYear()-b.getFullYear())*12+(t.getMonth()-b.getMonth()); if(t.getDate()<b.getDate())m--; if(m<0)return "";
+  const a=Math.floor(m/12),r=m%12; return a?`${a} ${a===1?"año":"años"}${r?` y ${r} ${r===1?"mes":"meses"}`:""}`:`${r} ${r===1?"mes":"meses"}`; }
+function renderHitos(){
+  const hs=S.hitos.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  $("#hitosList").innerHTML=hs.length?hs.map(x=>`<button class="card" data-hito="${esc(x.id)}" style="display:block;width:100%;text-align:left;padding:0;overflow:hidden">
+      ${x.img?`<img src="${esc(x.img)}" alt="" style="width:100%;max-height:340px;object-fit:cover;display:block">`:""}
+      <div style="padding:14px 16px"><div class="small">${esc(fmtShort(x.fecha))}${edadEn(x.fecha)?` · con ${esc(edadEn(x.fecha))}`:""}</div>
+      <h3 style="font-size:18px;margin:4px 0">${esc(x.titulo||"")}</h3>${x.texto?`<div style="white-space:pre-wrap;color:#6d5a53">${esc(x.texto)}</div>`:""}</div></button>`).join("")
+    :`<div class="card"><div class="empty"><div class="big">⭐</div>Primeras palabras, el primer día de piscina, momentos especiales…${S.canWrite?"<br>Pulsa + para guardar el primero.":""}</div></div>`;
+}
+function formHito(x){
+  if(!S.canWrite)return; const isNew=!x; x=x||{fecha:todayStr()}; let img=x.img||"";
+  openSheet(`<h2>${isNew?"Nuevo momento":"Editar momento"}</h2>
+    <label>Qué pasó</label><input id="hTit" placeholder="Ej.: Dijo su primera frase" value="${esc(x.titulo||"")}">
+    <label>Fecha</label><input id="hFec" type="date" value="${esc(x.fecha||"")}">
+    <label>Cuéntalo (opcional)</label><textarea id="hTxt">${esc(x.texto||"")}</textarea>
+    <label>Foto (opcional)</label><div id="hImgBox"></div><input type="file" id="hFile" accept="image/*" class="hidden">
+    <button class="btn ghost" id="hPick" type="button">📷 ${img?"Cambiar foto":"Añadir foto"}</button>
+    <button class="btn primary" id="bSave">Guardar</button>
+    ${isNew?`<button class="btn ghost" id="bCancel">Cancelar</button>`:`<button class="btn danger" id="bDel">Borrar momento</button>`}`);
+  const pinta=()=>{$("#hImgBox").innerHTML=img?`<img src="${esc(img)}" style="width:100%;border-radius:14px;max-height:260px;object-fit:cover">`:""};pinta();
+  $("#hPick").onclick=()=>$("#hFile").click();
+  $("#hFile").onchange=async e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;try{img=await comprimir(f,1200);pinta();}catch(err){toast("No se pudo leer esa foto")}};
+  if(isNew)$("#bCancel").onclick=closeSheet; else $("#bDel").onclick=()=>confirmDel("este momento",()=>del("hitos",x.id));
+  $("#bSave").onclick=async()=>{ const data={titulo:$("#hTit").value.trim(),fecha:$("#hFec").value,texto:$("#hTxt").value.trim(),img};
+    if(!data.titulo){toast("Escribe qué pasó");return} await save("hitos",isNew?null:x.id,data); };
+}
+function showHito(id){ const x=S.hitos.find(y=>y.id===id); if(!x)return; if(S.canWrite)return formHito(x);
+  openSheet(`${x.img?`<img src="${esc(x.img)}" style="width:100%;border-radius:14px;margin-top:8px">`:""}<h2 style="margin-top:12px">${esc(x.titulo)}</h2>
+    <div class="small">${esc(fmtShort(x.fecha))}${edadEn(x.fecha)?` · con ${esc(edadEn(x.fecha))}`:""}</div>${x.texto?`<p style="white-space:pre-wrap">${esc(x.texto)}</p>`:""}
+    <button class="btn ghost" id="bClose">Cerrar</button>`); $("#bClose").onclick=closeSheet; }
+
+/* ---------- resumen para el médico ---------- */
+function resumenTexto(){
+  const f=S.ficha||{}, hoy=todayStr(), L=[];
+  L.push(`${f.nombre||"Aime"}${f.nacimiento?` — ${edad(f.nacimiento)} (nació el ${fmtShort(f.nacimiento)})`:""}`);
+  if(f.grupo)L.push(`Grupo sanguíneo: ${f.grupo}`);
+  L.push(`Alergias: ${f.alergias||"ninguna anotada"}`);
+  if(f.tarjeta)L.push(`Tarjeta sanitaria: ${f.tarjeta}`);
+  if(f.notas)L.push(`Notas: ${f.notas}`);
+  const act=medsActivos(); L.push("", "MEDICACIÓN ACTUAL"); L.push(...(act.length?act.map(m=>`- ${m.nombre}${m.para?` (${m.para})`:""}${m.pauta?`: ${m.pauta}`:""}${m.fin?` — hasta ${fmtShort(m.fin)}`:""}`):["- Ninguna"]));
+  const ms=S.medidas.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)); L.push("","ÚLTIMA MEDIDA");
+  L.push(ms[0]?`- ${fmtShort(ms[0].fecha)}: ${ms[0].peso?ms[0].peso+" kg":"—"} · ${ms[0].talla?ms[0].talla+" cm":"—"}`:"- Sin datos");
+  const lim=(()=>{const d=new Date();d.setDate(d.getDate()-14);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})();
+  const fs=S.fiebre.filter(x=>x.fecha>=lim).sort((a,b)=>(b.fecha+(b.hora||"")).localeCompare(a.fecha+(a.hora||"")));
+  L.push("","FIEBRE Y SÍNTOMAS (últimos 14 días)"); L.push(...(fs.length?fs.map(x=>`- ${fmtShort(x.fecha)} ${x.hora||""}: ${x.temp?x.temp+"°C":""}${x.sintomas?` ${x.sintomas}`:""}${x.dado?` · dado: ${x.dado}`:""}`):["- Nada anotado"]));
+  const vp=S.vacunas.filter(v=>v.puesta).sort((a,b)=>(b.fechaPuesta||"").localeCompare(a.fechaPuesta||""));
+  const vn=S.vacunas.filter(v=>!v.puesta);
+  L.push("","VACUNAS PUESTAS"); L.push(...(vp.length?vp.map(v=>`- ${v.nombre}${v.dosis?` (${v.dosis})`:""}: ${fmtShort(v.fechaPuesta)}`):["- Ninguna anotada"]));
+  if(vn.length){L.push("","VACUNAS PENDIENTES");L.push(...vn.map(v=>`- ${v.nombre}${v.dosis?` (${v.dosis})`:""}${v.prevista?`: prevista ${fmtShort(v.prevista)}`:""}`));}
+  const cp=sortCitas(S.citas.filter(c=>c.fecha<hoy&&["pediatra","especialista","dentista","vacuna"].includes(c.tipo))).reverse().slice(0,3);
+  if(cp.length){L.push("","ÚLTIMAS CONSULTAS");L.push(...cp.map(c=>`- ${fmtShort(c.fecha)} · ${c.titulo||tipo(c.tipo).n}${c.resultado?`: ${c.resultado}`:""}`));}
+  return L.join("\n");
+}
+function verResumen(){
+  const txt=resumenTexto();
+  const html=esc(txt).split("\n").map(l=>/^[A-ZÁÉÍÓÚÑ ]{4,}( \(.*\))?$/.test(l)?`<h3 style="font-size:14px;color:var(--main-dark);margin:16px 0 4px;letter-spacing:.04em">${l}</h3>`:(l?`<div style="margin:2px 0">${l}</div>`:"")).join("");
+  openSheet(`<h2>🩺 Resumen para el médico</h2><div class="small">Actualizado a ${fmtShort(todayStr())}</div>
+    <div class="card" style="margin-top:12px;font-size:15px">${html}</div>
+    <button class="btn primary" id="bCopy">📋 Copiar texto</button><button class="btn ghost" id="bClose">Cerrar</button>`);
+  $("#bClose").onclick=closeSheet;
+  $("#bCopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(txt); toast("Copiado ✓ Ya puedes pegarlo en WhatsApp"); }catch(e){ toast("No se pudo copiar"); } };
+}
+
+/* ---------- copia de seguridad ---------- */
+async function descargarCopia(){
+  toast("Preparando copia…");
+  try{
+    const cols=["citas","vacunas","medidas","contactos","fiebre","medicamentos","hitos","listas","ficha","fotos"], out={fecha:new Date().toISOString(),app:"Las citas de Aime"};
+    for(const c of cols){ const s=await db.collection(c).get(); out[c]=s.docs.map(d=>({id:d.id,...d.data()})); }
+    const blob=new Blob([JSON.stringify(out,null,1)],{type:"application/json"}), url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download=`copia-aime-${todayStr()}.json`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},5000);
+    toast("Copia descargada ✓ Guárdala en Archivos o en tu correo");
+  }catch(e){ toast("No se pudo hacer la copia"); }
+}
+
 /* ---------- data ---------- */
 async function save(col,id,data,isDoc){
   if(!db){toast("Sin conexión con los datos");return}
@@ -916,6 +1080,7 @@ function startApp(){
   screen("main");
   const b=$("#roleBadge"); b.classList.remove("hidden"); b.textContent=S.isAdmin?"👑 Admin":S.canWrite?"✏️ Editar":"👀 Solo ver";
   $("#rolesHelp").classList.toggle("hidden",!S.gestiona);
+  $("#bBackup").classList.toggle("hidden",!S.gestiona);
   $("#yoBox").textContent=`${S.nombre||""} · ${S.email}`;
   updateFab(); render(); renderPersonas();
   estadoAvisos().then(escucharAvisos);
@@ -928,7 +1093,7 @@ function startApp(){
   unsubs.push(db.doc("ficha/aime").onSnapshot(s=>{S.ficha=s.exists?s.data():{};render();},()=>{}));
   unsubs.push(db.doc("ficha/foto").onSnapshot(s=>{S.foto=s.exists?(s.data().img||""):"";renderHeader();},()=>{}));
 
-  Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos")])
+  Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos"),listen("hitos","hitos"),listenListas()])
     .then(()=>{clearTimeout(timer);status("");});
 }
 let unUsers=null;
@@ -987,6 +1152,8 @@ $("#calPrev").onclick=()=>{S.calM--;if(S.calM<0){S.calM=11;S.calY--}render()};
 $("#calNext").onclick=()=>{S.calM++;if(S.calM>11){S.calM=0;S.calY++}render()};
 $("#editFicha").onclick=formFicha;
 $("#pendAviso").onclick=()=>setView("ficha");
+document.querySelectorAll(".bResumen").forEach(b=>b.onclick=verResumen);
+$("#bBackup").onclick=descargarCopia;
 $("#bCalTodas").onclick=()=>avisoCalendario(sortCitas(S.citas));
 $("#avatar").onclick=()=>{
   if(!S.canWrite) return;
@@ -1016,6 +1183,7 @@ $("#fotoInput").onchange=async e=>{
 $("#addContacto").onclick=()=>formContacto();
 $("#fab").onclick=()=>{
   if(S.view==="salud") return ({vac:formVacuna,med:formMedida,fie:formFiebre,rx:formRx})[S.segS]();
+  if(S.view==="hitos") return formHito();
   formCita();
 };
 document.addEventListener("click",e=>{
@@ -1025,6 +1193,7 @@ document.addEventListener("click",e=>{
   const m=e.target.closest("[data-med]"); if(m){const x=S.medidas.find(y=>y.id===m.dataset.med);if(x)formMedida(x);return}
   const fi=e.target.closest("[data-fie]"); if(fi){const x=S.fiebre.find(y=>y.id===fi.dataset.fie);if(x)formFiebre(x);return}
   const rx=e.target.closest("[data-rx]"); if(rx){const x=S.medicamentos.find(y=>y.id===rx.dataset.rx);if(x)showRx(x);return}
+  const hi=e.target.closest("[data-hito]"); if(hi){return showHito(hi.dataset.hito)}
   const ph=e.target.closest("[data-foto]"); if(ph){return verFoto(ph.dataset.foto)}
   const k=e.target.closest("[data-con]"); if(k){const x=S.contactos.find(y=>y.id===k.dataset.con);if(x)formContacto(x);return}
 });

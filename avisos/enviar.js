@@ -24,8 +24,9 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
 
 (async () => {
   const ahora = Date.now();
-  const [citasS, usersS, tokensS, fichaS] = await Promise.all([
-    db.collection("citas").get(), db.collection("usuarios").get(), db.collection("tokens").get(), db.doc("ficha/aime").get()]);
+  const [citasS, usersS, tokensS, fichaS, vacS, medS] = await Promise.all([
+    db.collection("citas").get(), db.collection("usuarios").get(), db.collection("tokens").get(), db.doc("ficha/aime").get(),
+    db.collection("vacunas").get(), db.collection("medicamentos").get()]);
   const nombre = (fichaS.exists && fichaS.data().nombre) || "Aime";
   const permitidos = new Set(usersS.docs.filter(u => { const d = u.data();
     return ["ver", "editar"].includes(d.rol) || (d.email || "").toLowerCase() === ADMIN; }).map(u => u.id));
@@ -53,6 +54,24 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
       if (ahora >= madrid(c.fecha, "08:00") && ahora < finDia)
         pendientes.push({ id: clave + "_hoy", title: `Hoy: ${titulo}`, body: `${nombre}${lugar}` });
     }
+  });
+
+  // Vacunas pendientes: una semana antes y el día antes (a las 19:00)
+  vacS.docs.forEach(doc => {
+    const v = doc.data(); if (v.puesta || !v.prevista) return;
+    const fin = madrid(v.prevista, "23:59"), clave = `vac_${doc.id}_${v.prevista}`;
+    const semana = new Date(Date.UTC(...v.prevista.split("-").map((x, i) => i === 1 ? x - 1 : +x)) - 7 * 864e5).toISOString().slice(0, 10);
+    const nom = `${v.nombre}${v.dosis ? " (" + v.dosis + ")" : ""}`;
+    if (ahora >= madrid(semana, "19:00") && ahora < madrid(diaAntes(v.prevista), "19:00"))
+      pendientes.push({ id: clave + "_semana", title: `💉 Vacuna en una semana`, body: `${nombre}: ${nom}` });
+    if (ahora >= madrid(diaAntes(v.prevista), "19:00") && ahora < fin)
+      pendientes.push({ id: clave + "_dia", title: `💉 Mañana toca vacuna`, body: `${nombre}: ${nom}` });
+  });
+  // Medicinas: el último día a las 9:00
+  medS.docs.forEach(doc => {
+    const m = doc.data(); if (m.terminado || !m.fin) return;
+    if (ahora >= madrid(m.fin, "09:00") && ahora < madrid(m.fin, "23:59"))
+      pendientes.push({ id: `med_${doc.id}_${m.fin}_fin`, title: `💊 Hoy es el último día`, body: `${nombre}: ${m.nombre}${m.para ? " (" + m.para + ")" : ""}` });
   });
 
   for (const p of pendientes) {
