@@ -257,7 +257,7 @@ const firebaseConfig = {
   appId: "1:203341907408:web:1da2aa4e342b1b133a65d5"
 };
 const ADMIN = "cesarjluzardo18@gmail.com";
-const VAPID = "__VAPID__"; // clave pública de Cloud Messaging
+const VAPID = "BGn0dpi-MwzVLIkL6fGZ2-x5BEcAo5VJFexmnXS8pTSsp2RjhPC9paP2Zd04cw4gdG1AH1q0LWq4eR2rbCjMZh0"; // clave pública de Cloud Messaging
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 let fdb; try{ fdb = initializeFirestore(fbApp,{localCache:persistentLocalCache()}); }catch(e){ fdb = getFirestore(fbApp); }
