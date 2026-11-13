@@ -24,6 +24,7 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
 
 (async () => {
   const ahora = Date.now();
+  const [cfgS] = await Promise.all([db.doc("config/mensaje").get()]);
   const [citasS, usersS, tokensS, fichaS, vacS, medS] = await Promise.all([
     db.collection("citas").get(), db.collection("usuarios").get(), db.collection("tokens").get(), db.doc("ficha/aime").get(),
     db.collection("vacunas").get(), db.collection("medicamentos").get()]);
@@ -74,11 +75,26 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
       pendientes.push({ id: `med_${doc.id}_${m.fin}_fin`, title: `💊 Hoy es el último día`, body: `${nombre}: ${m.nombre}${m.para ? " (" + m.para + ")" : ""}` });
   });
 
+  // Mensaje motivador del día (solo a las personas elegidas)
+  const cfg = cfgS.exists ? cfgS.data() : {};
+  if (cfg.activo && (cfg.destinatarios || []).length) {
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(ahora));
+    if (ahora >= madrid(hoy, cfg.hora || "09:00") && ahora < madrid(hoy, "23:59")) {
+      const frases = require("../mensajes.json").mensajes;
+      const [y, m, d] = hoy.split("-").map(Number);
+      const n = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(2026, 0, 1)) / 864e5);
+      const solo = new Set(cfg.destinatarios);
+      pendientes.push({ id: `msg_${hoy}`, title: "💌 Mensaje del día", body: frases[((n % frases.length) + frases.length) % frases.length], solo });
+    }
+  }
+
   for (const p of pendientes) {
     const ref = db.doc("avisos_enviados/" + p.id);
     if ((await ref.get()).exists) continue;
+    const lista = p.solo ? destinos.filter(d => p.solo.has(d.uid)) : destinos;
+    if (!lista.length) { await ref.set({ enviado: new Date().toISOString(), titulo: p.title, nadie: true }); continue; }
     const res = await admin.messaging().sendEachForMulticast({
-      tokens: destinos.map(d => d.token),
+      tokens: lista.map(d => d.token),
       notification: { title: p.title, body: p.body },
       webpush: { notification: { icon: URL_APP + "icon-192.png" }, fcmOptions: { link: URL_APP } }
     });
@@ -87,7 +103,7 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
     for (let i = 0; i < res.responses.length; i++) {
       const r = res.responses[i];
       if (!r.success && /not-registered|invalid-registration/.test(r.error?.code || "")) {
-        await db.doc("tokens/" + destinos[i].uid).update({ tokens: admin.firestore.FieldValue.arrayRemove(destinos[i].token) }).catch(() => {});
+        await db.doc("tokens/" + lista[i].uid).update({ tokens: admin.firestore.FieldValue.arrayRemove(lista[i].token) }).catch(() => {});
       }
     }
     await ref.set({ enviado: new Date().toISOString(), titulo: p.title });

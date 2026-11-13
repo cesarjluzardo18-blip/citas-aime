@@ -172,6 +172,14 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     <div class="alert hidden" id="notiBanner" style="background:#E6EEFA"><b style="color:#3D6597">🔔 Avisos de citas</b>
       <span id="notiBannerTx">Recibe un aviso el día antes y 1 hora antes de cada cita.</span>
       <button class="btn primary bNoti" type="button" style="background:#7FA6DA;margin-top:10px;padding:10px">Activar avisos</button></div>
+    <div class="card" id="relojBox" style="text-align:center;padding:14px 16px;background:linear-gradient(135deg,#FFFFFF,#FFF3EC)">
+      <div id="relojHora" style="font-family:Fredoka;font-size:44px;line-height:1.1;color:var(--ink)"></div>
+      <div id="relojFecha" class="small" style="font-size:14px"></div>
+    </div>
+    <div class="card hidden" id="fraseBox" style="background:#FDF0F4;border-left:5px solid #F4C6D4">
+      <div class="small" style="font-weight:700;color:#9A4865;text-transform:uppercase;letter-spacing:.04em">💌 Frase del día</div>
+      <div id="fraseTx" style="margin-top:6px;font-size:16px"></div>
+    </div>
     <button class="alert hidden" id="pendAviso" style="display:block;width:100%;text-align:left;border:0"><b>👋 Solicitudes de acceso</b><span id="pendAvisoTx"></span> <u>Revisar</u></button>
     <div id="heroBox"></div>
     <div class="seg" id="segCitas">
@@ -230,6 +238,16 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <div class="small" id="activosTx" style="margin:-4px 4px 8px;color:#2F7A57;font-weight:700"></div>
       <div class="card" id="personasBox"></div>
       <div class="small hidden" id="rolesHelp" style="margin:0 4px 8px">«Solo ver»: ve todo pero no cambia nada. «Puede editar»: añade y cambia citas y también aprueba a otras personas. «Sin acceso»: no puede entrar.</div>
+    </div>
+    <div id="msgCfgWrap" class="hidden">
+      <div class="section-title"><h2>💌 Mensaje del día</h2></div>
+      <div class="card">
+        <div class="small">Cada día se envía una frase bonita de madre e hija como notificación a las personas que marques.</div>
+        <label style="display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px"><input id="msgOn" type="checkbox" style="width:22px;height:22px"> Enviar cada día</label>
+        <label>A qué hora</label><input id="msgHora" type="time" value="09:00">
+        <label>A quién</label><div id="msgQuien"></div>
+        <button class="btn primary" id="msgSave" type="button">Guardar</button>
+      </div>
     </div>
     <div class="section-title"><h2>Mi cuenta</h2></div>
     <div class="card"><div class="small" id="yoBox"></div>
@@ -482,7 +500,7 @@ function renderHeader(){
 
 function render(){
   renderHeader();
-  if(S.view==="inicio")renderInicio();
+  if(S.view==="inicio"){renderInicio();tickReloj();pintarFrase();}
   if(S.view==="cal")renderCal();
   if(S.view==="salud")renderSalud();
   if(S.view==="ficha")renderFicha();
@@ -534,16 +552,16 @@ function formCita(c){
   openSheet(`<h2>${isNew?"Nueva cita":"Editar cita"}</h2>
     <label>Tipo</label>
     <div class="types" id="fTipos">${Object.entries(TIPOS).map(([k,t])=>`<button type="button" data-k="${k}" class="${k===sel?"on":""}" style="background:${t.c};color:${t.t}">${t.e} ${t.n}</button>`).join("")}</div>
+    <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
+    <div class="row2" id="fFecRow"><div><label id="fFecLbl">Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
+    <div id="fHorW"><label>Hora</label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div>
+    <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
     ${isNew?`<div><label>¿Se repite?</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option></select></div>
-      <div id="fHastaW" class="row2 hidden"><div><label>Desde</label><input id="fDesde" type="date" value="${esc(c.fecha||todayStr())}"></div><div><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
       <div id="fDiasW" class="hidden"><label>Qué días y a qué hora</label>
         <div class="types" id="fDias">${[[1,"L"],[2,"M"],[3,"X"],[4,"J"],[5,"V"],[6,"S"],[0,"D"]].map(([n,l])=>`<button type="button" data-d="${n}" style="background:#fff;width:42px;justify-content:center;padding:8px 0;border:2px solid var(--line)">${l}</button>`).join("")}</div>
         <div id="fDiasHoras" style="margin-top:8px"></div></div>
       <div id="fSueltasW" class="hidden"><label>Fechas y horas</label><div id="fSueltas"></div>
         <button type="button" class="btn ghost" id="fAddFecha" style="margin-top:8px;padding:10px">＋ Añadir otra fecha</button></div>`:""}
-    <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
-    <div class="row2" id="fFecRow"><div><label id="fFecLbl">Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
-    <div id="fHorW"><label>Hora</label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div></div>
     <label>Lugar</label><input id="fLug" placeholder="Centro de salud, piscina…" value="${esc(c.lugar||"")}">
     <label>Quién la lleva</label><input id="fQui" value="${esc(c.quien||"")}">
     <label>Qué llevar / preguntar</label><textarea id="fNot">${esc(c.notas||"")}</textarea>
@@ -572,8 +590,8 @@ function formCita(c){
     $("#fRep").onchange=e=>{const v=e.target.value; $("#fSueltasW").classList.toggle("hidden",v!=="x");
       if(v==="x"){ if(!sueltas.length){sueltas.push({fecha:$("#fFec").value,hora:$("#fHor").value});sueltas.push({fecha:"",hora:$("#fHor").value});} pintaSueltas(); }
       const on=v==="7";$("#fHastaW").classList.toggle("hidden",!on);$("#fDiasW").classList.toggle("hidden",!on);
-      $("#fFecRow").classList.toggle("hidden",v!=="0");
-      if(on&&!Object.keys(diasSel).length&&$("#fDesde").value){diasSel[parseD($("#fDesde").value).getDay()]=$("#fHor").value;} pintaDias();};
+      $("#fFecRow").classList.toggle("hidden",v==="x"); $("#fHorW").classList.toggle("hidden",on); $("#fFecLbl").textContent=on?"Desde":"Fecha";
+      if(on&&!Object.keys(diasSel).length&&$("#fFec").value){diasSel[parseD($("#fFec").value).getDay()]=$("#fHor").value;} pintaDias();};
     document.querySelectorAll("#fDias button").forEach(b=>b.onclick=()=>{const d=b.dataset.d; if(d in diasSel)delete diasSel[d]; else diasSel[d]=$("#fHor").value; pintaDias();});
   }
   document.querySelectorAll("#fTipos button").forEach(b=>b.onclick=()=>{sel=b.dataset.k;document.querySelectorAll("#fTipos button").forEach(x=>x.classList.toggle("on",x===b))});
@@ -590,11 +608,11 @@ function formCita(c){
         closeSheet(); toast(`✓ ${fs.length} citas creadas`); }catch(e){ handleWriteErr(e); }
       return;
     }
-    if(!data.fecha&&!(isNew&&$("#fRep").value==="7")){toast("Pon una fecha");return}
+    if(!data.fecha){toast("Pon una fecha");return}
     if(isNew){
       const cada=+$("#fRep").value;
       if(cada){
-        data.fecha=$("#fDesde").value; if(!data.fecha){toast("Pon la fecha «Desde»");return}
+        if(!data.fecha){toast("Pon la fecha «Desde»");return}
         const hasta=$("#fHasta").value; if(!hasta||hasta<data.fecha){toast("Revisa la fecha «Hasta»");return}
         const dias=Object.keys(diasSel).map(Number); if(!dias.length){toast("Elige al menos un día");return}
         const fechas=[]; const d=parseD(data.fecha); const ini=parseD(data.fecha);
@@ -992,6 +1010,33 @@ async function descargarCopia(){
   }catch(e){ toast("No se pudo hacer la copia"); }
 }
 
+/* ---------- reloj y frase del día ---------- */
+function tickReloj(){ const d=new Date(); if(!$("#relojHora"))return;
+  $("#relojHora").textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  $("#relojFecha").textContent=`${DIAS[d.getDay()].replace(/^./,x=>x.toUpperCase())} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`; }
+setInterval(tickReloj,1000*15); tickReloj();
+let FRASES=[];
+function numDia(){ const d=new Date(); return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(2026,0,1))/864e5); }
+fetch("mensajes.json").then(r=>r.json()).then(j=>{FRASES=j.mensajes||[];pintarFrase();}).catch(()=>{});
+function pintarFrase(){ if(!FRASES.length||!$("#fraseBox"))return; const i=((numDia()%FRASES.length)+FRASES.length)%FRASES.length;
+  $("#fraseTx").textContent=FRASES[i]; $("#fraseBox").classList.remove("hidden"); }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){tickReloj();pintarFrase();} });
+
+/* ---------- configuración del mensaje diario ---------- */
+function renderMsgCfg(){
+  $("#msgCfgWrap").classList.toggle("hidden",!S.gestiona); if(!S.gestiona)return;
+  const c=S.msgCfg||{}; const quien=new Set(c.destinatarios||[]);
+  if(!S._msgCfgTocado){ $("#msgOn").checked=!!c.activo; $("#msgHora").value=c.hora||"09:00"; }
+  const us=S.usuarios.filter(u=>["ver","editar"].includes(u.rol)||(u.email||"").toLowerCase()===ADMIN);
+  $("#msgQuien").innerHTML=us.length?us.map(u=>`<label style="display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px;margin:8px 0;text-transform:none;letter-spacing:0"><input type="checkbox" data-mq="${esc(u.id)}" ${quien.has(u.id)?"checked":""} style="width:22px;height:22px"> ${esc(u.nombre||u.email||"")}</label>`).join(""):`<div class="small">Primero aprueba a las personas.</div>`;
+}
+document.addEventListener("input",e=>{ if(e.target.closest&&e.target.closest("#msgCfgWrap")) S._msgCfgTocado=true; });
+$("#msgSave").onclick=async()=>{
+  const dest=[...document.querySelectorAll("[data-mq]")].filter(x=>x.checked).map(x=>x.dataset.mq);
+  try{ await db.doc("config/mensaje").set({activo:$("#msgOn").checked,hora:$("#msgHora").value||"09:00",destinatarios:dest,actualizado:new Date().toISOString()});
+    S._msgCfgTocado=false; toast("Guardado ✓"); }catch(e){ handleWriteErr(e); }
+};
+
 /* ---------- data ---------- */
 async function save(col,id,data,isDoc){
   if(!db){toast("Sin conexión con los datos");return}
@@ -1061,6 +1106,7 @@ function renderPersonas(){
       <span class="ico" style="background:${bg}">${ico}</span>
       <span class="tx"><b>${esc(u.nombre||"Sin nombre")}${yo?" (tú)":""}</b><span>${esc(visto)}</span><span style="display:block;font-size:12px">${esc(u.email||"")}</span></span>
       ${ctrl}</div>`;}).join(""):`<div class="empty small">Cuando alguien se registre, aparecerá aquí para aprobarlo.</div>`;
+  renderMsgCfg();
   const pend=us.filter(u=>u.rol==="pendiente"&&!esAdm(u)).length;
   $("#pendBadge").textContent=pend?`${pend} pendiente${pend>1?"s":""}`:"";
   $("#pendBadge").classList.toggle("hidden",!pend);
@@ -1141,6 +1187,7 @@ function startApp(){
   status("Cargando…");
   const timer=setTimeout(()=>status("No se pueden cargar los datos ahora mismo. Revisa la conexión."),10000);
   unsubs.push(db.doc("ficha/aime").onSnapshot(s=>{S.ficha=s.exists?s.data():{};render();},()=>{}));
+  unsubs.push(db.doc("config/mensaje").onSnapshot(s=>{S.msgCfg=s.exists?s.data():{};renderMsgCfg();},()=>{}));
   unsubs.push(db.doc("ficha/foto").onSnapshot(s=>{S.foto=s.exists?(s.data().img||""):"";renderHeader();},()=>{}));
 
   Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos"),listen("hitos","hitos"),listenListas()])
