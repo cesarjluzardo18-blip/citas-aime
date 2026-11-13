@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function dentro() { return request.auth != null; }
+    function esAdmin() { return dentro() && request.auth.token.email == "cesarjluzardo18@gmail.com"; }
+    function miRol() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol : "pendiente";
+    }
+    function puedeVer() { return esAdmin() || (dentro() && miRol() in ["ver", "editar"]); }
+    function puedeEditar() { return esAdmin() || (dentro() && miRol() == "editar"); }
+
+    // Personas: cada uno ve su ficha; solo el administrador aprueba y cambia permisos
+    match /usuarios/{uid} {
+      allow read: if esAdmin() || (dentro() && request.auth.uid == uid);
+      allow create: if dentro() && request.auth.uid == uid && request.resource.data.rol == "pendiente";
+      allow update, delete: if esAdmin();
+    }
+
+    // Datos de Aime
+    match /{col}/{id} {
+      allow read: if col in ["citas","vacunas","medidas","contactos","fiebre","medicamentos","fotos","ficha"] && puedeVer();
+      allow write: if col in ["citas","vacunas","medidas","contactos","fiebre","medicamentos","fotos","ficha"] && puedeEditar();
+    }
+  }
+}
