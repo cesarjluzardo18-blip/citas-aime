@@ -86,7 +86,9 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
       const [y, m, d] = hoy.split("-").map(Number);
       const n = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(2026, 0, 1)) / 864e5);
       const solo = new Set(cfg.destinatarios);
-      pendientes.push({ id: `msg_${hoy}`, title: "💌 Mensaje del día", body: frases[((n % frases.length) + frases.length) % frases.length], solo });
+      const para = cfg.para || "Keyla", de = cfg.de || "César";
+      const frase = frases[((n % frases.length) + frases.length) % frases.length].replace(/\{hija\}/g, nombre);
+      pendientes.push({ id: `msg_${hoy}`, title: `💌 ${para}, un mensaje de ${de}`, body: `${frase}\n— ${de} 💛`, solo });
     }
   }
 
