@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Notificación de prueba: escribe un correo, o 'todos'. Vacío = revisión normal"
+        required: false
+        default: ""
 jobs:
   avisos:
     runs-on: ubuntu-latest
@@ -15,3 +20,4 @@ jobs:
       - run: node avisos/enviar.js
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PRUEBA: ${{ github.event.inputs.prueba }}

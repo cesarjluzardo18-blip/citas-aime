@@ -37,6 +37,23 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
   tokensS.docs.forEach(t => { if (permitidos.has(t.id)) (t.data().tokens || []).forEach(tok => destinos.push({ uid: t.id, token: tok })); });
   if (!destinos.length) { console.log("Nadie ha activado los avisos todavía."); return; }
 
+  // Notificación de prueba (se lanza a mano desde GitHub, no marca nada como enviado)
+  const PRUEBA = (process.env.PRUEBA || "").trim().toLowerCase();
+  if (PRUEBA) {
+    const uids = PRUEBA === "todos" ? null : new Set(usersS.docs.filter(u => (u.data().email || "").toLowerCase() === PRUEBA).map(u => u.id));
+    const lista = uids ? destinos.filter(d => uids.has(d.uid)) : destinos;
+    console.log(`Prueba: ${lista.length} móvil(es) con avisos activados de ${new Set(lista.map(d => d.uid)).size} persona(s).`);
+    if (!lista.length) return;
+    const res = await admin.messaging().sendEachForMulticast({
+      tokens: lista.map(d => d.token),
+      notification: { title: "🔔 Prueba de avisos", body: "Si ves esto y ha sonado, los avisos de la app de Aime funcionan bien." },
+      webpush: { headers: { Urgency: "high" }, notification: { icon: URL_APP + "icon-192.png", silent: false }, fcmOptions: { link: URL_APP } }
+    });
+    console.log(`Prueba: ${res.successCount} enviados, ${res.failureCount} fallidos`);
+    res.responses.forEach(r => { if (!r.success) console.log("  fallo:", r.error?.code); });
+    return;
+  }
+
   const pendientes = [];
   citasS.docs.forEach(doc => {
     const c = doc.data(); if (!c.fecha) return;
@@ -100,7 +117,7 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
     const res = await admin.messaging().sendEachForMulticast({
       tokens: lista.map(d => d.token),
       notification: { title: p.title, body: p.body },
-      webpush: { notification: { icon: URL_APP + "icon-192.png" }, fcmOptions: { link: URL_APP } }
+      webpush: { headers: { Urgency: "high" }, notification: { icon: URL_APP + "icon-192.png", silent: false }, fcmOptions: { link: URL_APP } }
     });
     console.log(`${p.title}: ${res.successCount} enviados, ${res.failureCount} fallidos`);
     // Quita los móviles que ya no existen
