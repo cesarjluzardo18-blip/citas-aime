@@ -232,6 +232,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <div id="fraseTx" style="margin-top:6px;font-size:16px"></div>
       <div id="fraseFirma" style="margin-top:8px;text-align:right;font-weight:700;color:#9A4865"></div>
     </div>
+    <button class="alert hidden" id="dupAviso" style="display:block;width:100%;text-align:left;border:0;background:#FDE6DB"><b style="color:var(--main-dark)">🧹 Citas repetidas</b><span id="dupAvisoTx"></span> <u>Quitar repetidas</u></button>
     <button class="alert hidden" id="pendAviso" style="display:block;width:100%;text-align:left;border:0"><b>👋 Solicitudes de acceso</b><span id="pendAvisoTx"></span> <u>Revisar</u></button>
     <div id="heroBox"></div>
     </div>
@@ -449,6 +450,9 @@ function citaHTML(c){
 }
 
 function renderInicio(){
+  const dups=S.canWrite?citasRepetidas():[];
+  $("#dupAviso").classList.toggle("hidden",!dups.length);
+  if(dups.length) $("#dupAvisoTx").textContent=` Hay ${dups.length} cita${dups.length>1?"s":""} apuntada${dups.length>1?"s":""} dos veces.`;
   const hoy=todayStr();
   const prox=sortCitas(S.citas.filter(c=>c.fecha>=hoy));
   const hist=sortCitas(S.citas.filter(c=>c.fecha<hoy)).reverse();
@@ -591,7 +595,7 @@ function render(){
 }
 
 /* ---------- sheets ---------- */
-function openSheet(html){ $("#sheet").innerHTML=`<button class="x" id="bX" aria-label="Cerrar">✕</button>`+html; $("#overlay").classList.add("show"); $("#sheet").scrollTop=0; $("#bX").onclick=closeSheet; try{window.scrollTo(0,0)}catch(e){} }
+function openSheet(html){ bloqueo=0; $("#sheet").innerHTML=`<button class="x" id="bX" aria-label="Cerrar">✕</button>`+html; $("#overlay").classList.add("show"); $("#sheet").scrollTop=0; $("#bX").onclick=closeSheet; try{window.scrollTo(0,0)}catch(e){} }
 function closeSheet(){ $("#overlay").classList.remove("show"); }
 $("#overlay").addEventListener("click",e=>{ if(e.target.id==="overlay")closeSheet(); });
 
@@ -602,6 +606,7 @@ function showCita(id){
     <h2 style="margin-top:10px">${esc(c.titulo||t.n)}</h2>
     <div class="small">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(h12(c.hora))}`:""} · ${countdown(c.fecha)}</div>
     <div class="card" style="margin-top:14px">
+      ${c.fechaAnterior?r("🔄 Cambiada",`Antes era el ${fmtShort(c.fechaAnterior)}${c.horaAnterior?" a las "+h12(c.horaAnterior):""}`):""}
       ${r("Lugar",c.lugar)}${r("Quién la lleva",c.quien)}${r("Qué llevar / preguntar",c.notas)}${r("Qué dijeron / resultado",c.resultado)}
       ${!c.lugar&&!c.quien&&!c.notas&&!c.resultado?'<div class="small">Sin más detalles.</div>':""}
     </div>
@@ -611,10 +616,10 @@ function showCita(id){
       <input type="file" id="docInput" accept="image/*" multiple class="hidden">
     </div>
     ${c.fecha>=todayStr()?`<button class="btn primary" id="bCal" style="background:#7FA6DA">🔔 Añadir aviso a mi calendario</button>`:""}
-    ${S.canWrite?`<button class="btn primary" id="bEdit">Editar</button>`:""}
+    ${S.canWrite?`<button class="btn primary" id="bMover" style="background:#7FA6DA">📅 Cambiar fecha u hora</button><button class="btn ghost" id="bEdit">✏️ Modificar toda la cita</button>`:""}
     <button class="btn ghost" id="bClose">Cerrar</button>`);
   $("#bClose").onclick=closeSheet;
-  if(S.canWrite)$("#bEdit").onclick=()=>formCita(c);
+  if(S.canWrite){ $("#bEdit").onclick=()=>formCita(c); $("#bMover").onclick=()=>formMover(c); }
   if($("#bCal"))$("#bCal").onclick=()=>avisoCalendario([c]);
   cargarFotos(c.id);
   pintarLista(c.tipo||"otro");
@@ -687,9 +692,9 @@ function formCita(c){
       const fs=(S._sueltas||[]).filter(s=>s.fecha).sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
       if(!fs.length){toast("Añade al menos una fecha");return}
       const serieId=fs.length>1?"s"+Date.now().toString(36):null;
-      toast(`Creando ${fs.length} citas…`);
-      try{ for(const f of fs){ const d={...data,fecha:f.fecha,hora:f.hora||"",actualizado:new Date().toISOString()}; if(serieId)d.serieId=serieId; await db.collection("citas").add(d); }
-        closeSheet(); toast(`✓ ${fs.length} citas creadas`); }catch(e){ handleWriteErr(e); }
+      if(!bloquear())return;
+      let n=0; for(const f of fs){ const d={...data,fecha:f.fecha,hora:f.hora||"",actualizado:new Date().toISOString()}; if(serieId)d.serieId=serieId; if(yaExiste(d))continue; escribir(db.collection("citas").add(d)); n++; }
+      closeSheet(); toast(n?`✓ ${n} citas creadas`:"Esas citas ya estaban apuntadas");
       return;
     }
     if(!data.fecha){toast("Pon una fecha");return}
@@ -709,8 +714,9 @@ function formCita(c){
         }
         if(!fechas.length){toast("No sale ninguna fecha con esos días");return}
         const serieId="s"+Date.now().toString(36);
-        toast(`Creando ${fechas.length} citas…`);
-        try{ for(const f of fechas) await db.collection("citas").add({...data,fecha:f.fecha,hora:f.hora,serieId,actualizado:new Date().toISOString()});
+        if(!bloquear())return;
+        try{ let n=0; for(const f of fechas){ const d={...data,fecha:f.fecha,hora:f.hora,serieId,actualizado:new Date().toISOString()}; if(yaExiste(d))continue; escribir(db.collection("citas").add(d)); n++; }
+          fechas.length=n;
           closeSheet(); toast(`✓ ${fechas.length} citas creadas`); }catch(e){ handleWriteErr(e); }
         return;
       }
@@ -962,6 +968,43 @@ function avisoCalendario(lista){
   toast(lista.length===1?"Pulsa «Añadir» en tu calendario":`Pulsa «Añadir todo» (${lista.length} citas)`);
 }
 
+/* ---------- cambiar fecha u hora ---------- */
+function formMover(c){
+  openSheet(`<h2>📅 Cambiar fecha u hora</h2>
+    <div class="small">${esc(tipo(c.tipo).e)} ${esc(c.titulo||tipo(c.tipo).n)} · ahora: ${esc(fmtD(c.fecha))}${c.hora?` a las ${esc(h12(c.hora))}`:""}</div>
+    <div class="row2"><div><label>Nueva fecha</label><input id="mvFec" type="date" value="${esc(c.fecha)}"></div>
+    <div><label>Nueva hora</label>${tp('id="mvHor"',c.hora||"")}</div></div>
+    ${c.serieId?`<div class="small" style="margin-top:12px">🔁 Solo se cambia esta cita, no las demás de la serie.</div>`:""}
+    <button class="btn primary" id="bSave">Guardar cambio</button><button class="btn ghost" id="bNo">Cancelar</button>`);
+  $("#bNo").onclick=()=>showCita(c.id);
+  $("#bSave").onclick=()=>{
+    const fecha=$("#mvFec").value, hora=$("#mvHor").value;
+    if(!fecha){toast("Pon la nueva fecha");return}
+    if(fecha===c.fecha&&hora===(c.hora||"")){toast("No has cambiado nada");return}
+    const {id,...resto}=c; save("citas",c.id,{...resto,fecha,hora,fechaAnterior:c.fecha,horaAnterior:c.hora||""});
+  };
+}
+
+/* ---------- citas repetidas ---------- */
+function citasRepetidas(){
+  const grupos={}; S.citas.forEach(c=>{ (grupos[claveCita(c)]=grupos[claveCita(c)]||[]).push(c); });
+  const peso=c=>(c.resultado||"").length*3+(c.notas||"").length*2+(c.titulo||"").length+(c.lugar||"").length+(c.quien||"").length;
+  const sobran=[];
+  Object.values(grupos).forEach(g=>{ if(g.length<2)return;
+    g.sort((a,b)=>peso(b)-peso(a)||(a.actualizado||"").localeCompare(b.actualizado||""));
+    sobran.push(...g.slice(1)); });
+  return sobran;
+}
+function quitarRepetidas(){
+  const sobran=citasRepetidas(); if(!sobran.length){toast("No hay citas repetidas");return}
+  openSheet(`<h2>🧹 Quitar citas repetidas</h2>
+    <p>Hay <b>${sobran.length}</b> cita${sobran.length>1?"s":""} apuntada${sobran.length>1?"s":""} dos veces (mismo tipo, mismo día y misma hora). Se borran las copias y se queda una de cada: la que tenga título, notas o resultado.</p>
+    <div class="card">${sobran.slice(0,12).map(c=>`<div class="small" style="margin:4px 0">${esc(tipo(c.tipo).e)} ${esc(c.titulo||tipo(c.tipo).n)} · ${esc(fmtShort(c.fecha))}${c.hora?" "+esc(h12(c.hora)):""}</div>`).join("")}${sobran.length>12?`<div class="small">…y ${sobran.length-12} más</div>`:""}</div>
+    <button class="btn primary" id="bYes">Quitar ${sobran.length} repetida${sobran.length>1?"s":""}</button><button class="btn ghost" id="bNo">Cancelar</button>`);
+  $("#bNo").onclick=closeSheet;
+  $("#bYes").onclick=()=>{ if(!bloquear())return; sobran.forEach(c=>escribir(db.doc("citas/"+c.id).delete())); closeSheet(); toast(`✓ ${sobran.length} repetidas quitadas`); };
+}
+
 /* ---------- series de citas ---------- */
 function elegirSerie(accion,c,data){
   const sig=S.citas.filter(x=>x.serieId===c.serieId&&x.fecha>=c.fecha);
@@ -973,15 +1016,15 @@ function elegirSerie(accion,c,data){
   $("#bNo").onclick=closeSheet;
   $("#bSolo").onclick=async()=>{ if(accion==="borrar") await del("citas",c.id); else await save("citas",c.id,{...data,serieId:c.serieId}); };
   $("#bTodas").onclick=async()=>{
+    if(!bloquear())return;
     try{
-      toast("Guardando…");
       for(const x of sig){
-        if(accion==="borrar") await db.doc("citas/"+x.id).delete();
+        if(accion==="borrar") escribir(db.doc("citas/"+x.id).delete());
         else{ const {fecha,resultado,...comun}=data;
           const nuevo={...x,...comun,serieId:c.serieId,actualizado:new Date().toISOString()};
           if(data.hora===c.hora || x.hora!==c.hora) nuevo.hora=x.hora; // si cambias la hora, solo cambia en los días que tenían la misma hora
           if(x.id===c.id){ nuevo.fecha=fecha; nuevo.resultado=resultado; }
-          delete nuevo.id; await db.doc("citas/"+x.id).set(nuevo); }
+          delete nuevo.id; escribir(db.doc("citas/"+x.id).set(nuevo)); }
       }
       closeSheet(); toast(accion==="borrar"?"Borradas ✓":"Cambiadas ✓");
     }catch(e){ handleWriteErr(e); }
@@ -1138,18 +1181,26 @@ $("#msgSave").onclick=async()=>{
 };
 
 /* ---------- data ---------- */
+// Evita guardar dos veces si se pulsa el botón repetidamente
+let bloqueo=0;
+function bloquear(){ const ahora=Date.now(); if(ahora-bloqueo<2500) return false; bloqueo=ahora;
+  document.querySelectorAll("#sheet .btn").forEach(b=>{b.disabled=true;b.style.opacity=.6}); return true; }
+// Misma cita = mismo tipo, mismo día y misma hora (aunque cambie el título)
+function claveCita(d){ return [d.tipo||"",d.fecha||"",d.hora||""].join("|"); }
+function yaExiste(d,excepto){ const k=claveCita(d); return S.citas.some(c=>c.id!==excepto&&claveCita(c)===k); }
+// Escribe sin esperar al servidor: los datos se ven al momento y se suben solos
+function escribir(promesa){ promesa.catch(e=>handleWriteErr(e)); }
 async function save(col,id,data,isDoc){
   if(!db){toast("Sin conexión con los datos");return}
-  try{
-    data.actualizado=new Date().toISOString();
-    if(isDoc||id) await db.doc(`${col}/${id}`).set(data);
-    else await db.collection(col).add(data);
-    closeSheet(); toast("Guardado ✓");
-  }catch(e){ handleWriteErr(e); }
+  if(!bloquear())return;
+  data.actualizado=new Date().toISOString();
+  if(col==="citas"&&!id&&yaExiste(data)){ closeSheet(); toast(`Ya hay una cita de ${tipo(data.tipo).n} ese día a esa hora`); return; }
+  escribir((isDoc||id) ? db.doc(`${col}/${id}`).set(data) : db.collection(col).add(data));
+  closeSheet(); toast("Guardado ✓");
 }
 async function del(col,id){
-  try{ await db.doc(`${col}/${id}`).delete(); closeSheet(); toast("Borrado"); }
-  catch(e){ handleWriteErr(e); }
+  if(!bloquear())return;
+  escribir(db.doc(`${col}/${id}`).delete()); closeSheet(); toast("Borrado");
 }
 function handleWriteErr(e){
   if(e&&e.code==="permission-denied"){ closeSheet(); toast("No tienes permiso para cambiar esto"); return; }
@@ -1351,6 +1402,7 @@ $("#calPrev").onclick=()=>{S.calM--;if(S.calM<0){S.calM=11;S.calY--}render()};
 $("#calNext").onclick=()=>{S.calM++;if(S.calM>11){S.calM=0;S.calY++}render()};
 $("#editFicha").onclick=formFicha;
 $("#pendAviso").onclick=()=>setView("ficha");
+$("#dupAviso").onclick=quitarRepetidas;
 document.querySelectorAll(".bResumen").forEach(b=>b.onclick=verResumen);
 $("#bBackup").onclick=descargarCopia;
 $("#bCalTodas").onclick=()=>avisoCalendario(sortCitas(S.citas));
