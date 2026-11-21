@@ -15,7 +15,7 @@ service cloud.firestore {
       allow read: if puedeEditar() || (dentro() && request.auth.uid == uid);
       allow create: if dentro() && request.auth.uid == uid && request.resource.data.rol == "pendiente";
       allow update: if esAdmin()
-        || (dentro() && request.auth.uid == uid && soloCambia(["ultimaVez"]))
+        || (dentro() && request.auth.uid == uid && soloCambia(["ultimaVez", "vistoReac"]))
         || (puedeEditar() && request.auth.uid != uid
             && resource.data.email != "cesarjluzardo18@gmail.com"
             && soloCambia(["rol"])

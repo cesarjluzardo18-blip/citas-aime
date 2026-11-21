@@ -224,6 +224,10 @@ nav.tabs button.on .ic{filter:none;opacity:1}
   <section id="v-inicio">
     <div class="buscar"><input id="buscar" type="search" placeholder="🔎 Buscar citas, vacunas, medicinas, hitos…" autocomplete="off"></div>
     <div class="colA">
+    <div class="card hidden" id="novBox" style="border-left:5px solid var(--main)">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">🔔 Novedades</b><button id="novVisto" class="chip" style="background:var(--main-soft);color:var(--main-dark)">Marcar como visto</button></div>
+      <div id="novList" style="margin-top:6px"></div>
+    </div>
     <div class="alert hidden" id="notiBanner" style="background:#E6EEFA"><b style="color:#3D6597">🔔 Avisos de citas</b>
       <span id="notiBannerTx">Recibe un aviso el día antes y 1 hora antes de cada cita.</span>
       <button class="btn primary bNoti" type="button" style="background:#7FA6DA;margin-top:10px;padding:10px">Activar avisos</button></div>
@@ -477,7 +481,23 @@ function pintarBusqueda(){
 }
 $("#buscar").addEventListener("input",()=>render());
 
+function novedades(){
+  const vis=S.vistoReac||"", out=[];
+  Object.entries(S.reac||{}).forEach(([hid,rs])=>{ const hi=S.hitos.find(x=>x.id===hid); if(!hi)return;
+    rs.forEach(r=>{ if(r.uid===S.uid||!(r.emojis||[]).length||(r.actualizado||"")<=vis)return;
+      out.push({quien:r.nombre||"Alguien",emo:r.emojis.join(""),titulo:hi.titulo,cuando:r.actualizado}); }); });
+  return out.sort((a,b)=>b.cuando.localeCompare(a.cuando));
+}
+function hace(iso){ const m=Math.round((Date.now()-new Date(iso).getTime())/60000); if(m<1)return "ahora"; if(m<60)return `hace ${m} min`; const h=Math.round(m/60); if(h<24)return `hace ${h} h`; const d=Math.round(h/24); return d===1?"ayer":`hace ${d} días`; }
+function pintarNovedades(){
+  const ns=novedades(); $("#novBox").classList.toggle("hidden",!ns.length); if(!ns.length)return;
+  $("#novList").innerHTML=ns.slice(0,6).map(n=>`<button data-nov="1" style="display:block;width:100%;text-align:left;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-size:18px">${esc(n.emo)}</span> <b>${esc(n.quien)}</b> reaccionó a «${esc(n.titulo)}» <span class="small">· ${hace(n.cuando)}</span></button>`).join("")+(ns.length>6?`<div class="small" style="margin-top:6px">…y ${ns.length-6} más</div>`:"");
+}
+$("#novVisto").onclick=()=>{ const ahora=new Date().toISOString(); S.vistoReac=ahora; pintarNovedades(); escribir(fb.updateDoc(fb.doc(fdb,"usuarios/"+S.uid),{vistoReac:ahora})); };
+document.addEventListener("click",e=>{ if(e.target.closest&&e.target.closest("[data-nov]")) setView("hitos"); });
+
 function renderInicio(){
+  pintarNovedades();
   const buscando=$("#buscar").value.trim().length>0;
   document.querySelector("#v-inicio .colA").classList.toggle("hidden",buscando);
   $("#v-inicio").classList.toggle("buscando",buscando);
@@ -1100,7 +1120,7 @@ function edadEn(fecha){ const n=S.ficha&&S.ficha.nacimiento; if(!n||!fecha)retur
 /* ---------- reacciones a los hitos ---------- */
 const EMOJIS=["❤️","😍","😂","🥹","👏","😮"];
 function listenReacciones(){
-  return new Promise(res=>{ const un=db.collection("reacciones").onSnapshot(s=>{ const m={}; s.docs.forEach(d=>{const r=d.data(); (m[r.hito]=m[r.hito]||[]).push(r);}); S.reac=m; res(); if(S.view==="hitos")renderHitos(); },()=>res()); unsubs.push(un); });
+  return new Promise(res=>{ const un=db.collection("reacciones").onSnapshot(s=>{ const m={}; s.docs.forEach(d=>{const r=d.data(); (m[r.hito]=m[r.hito]||[]).push(r);}); S.reac=m; res(); if(S.view==="hitos")renderHitos(); if(S.view==="inicio")pintarNovedades(); },()=>res()); unsubs.push(un); });
 }
 function barraReacciones(hid){
   const rs=(S.reac||{})[hid]||[], mias=(rs.find(r=>r.uid===S.uid)||{}).emojis||[];
@@ -1115,7 +1135,7 @@ async function reaccionar(hid,e){
   const nuevas=mias.includes(e)?mias.filter(x=>x!==e):[...mias,e];
   // se ve al momento
   const otras=rs.filter(r=>r.uid!==S.uid); S.reac={...(S.reac||{}),[hid]:nuevas.length?[...otras,{hito:hid,uid:S.uid,emojis:nuevas}]:otras}; renderHitos();
-  escribir(nuevas.length?ref.set({hito:hid,uid:S.uid,emojis:nuevas,actualizado:new Date().toISOString()}):ref.delete());
+  escribir(nuevas.length?ref.set({hito:hid,uid:S.uid,nombre:S.nombre||(S.email||"").split("@")[0],emojis:nuevas,actualizado:new Date().toISOString()}):ref.delete());
 }
 document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest("[data-reac]"); if(!b)return; e.stopPropagation(); reaccionar(b.dataset.reac,b.dataset.emo); },true);
 
@@ -1439,7 +1459,7 @@ fb.onAuthStateChanged(auth,async u=>{
     if(!snap.exists()) await fb.setDoc(ref,{email:S.email,nombre:(nombreNuevo||S.email.split("@")[0]),rol:"pendiente",creado:new Date().toISOString()});
   }catch(e){}
   unMe=fb.onSnapshot(ref,s=>{
-    const d=s.exists()?s.data():{}; S.nombre=d.nombre||""; const rol=d.rol||"pendiente";
+    const d=s.exists()?s.data():{}; S.nombre=d.nombre||""; S.vistoReac=d.vistoReac||""; const rol=d.rol||"pendiente";
     if(S.isAdmin||rol==="ver"||rol==="editar"){
       S.canWrite=S.isAdmin||rol==="editar"; S.gestiona=S.canWrite; startApp();
     }else{
