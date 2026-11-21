@@ -22,6 +22,13 @@ service cloud.firestore {
             && request.resource.data.rol in ["pendiente", "ver", "editar", "bloqueado"]);
       allow delete: if esAdmin();
     }
+    // Reacciones a los hitos: cualquiera aprobado reacciona, cada uno con las suyas
+    match /reacciones/{rid} {
+      allow read: if puedeVer();
+      allow create, update: if puedeVer() && request.resource.data.uid == request.auth.uid
+        && rid == request.resource.data.hito + "_" + request.auth.uid;
+      allow delete: if puedeVer() && resource.data.uid == request.auth.uid;
+    }
     match /tokens/{uid} {
       allow read, write: if dentro() && request.auth.uid == uid;
     }

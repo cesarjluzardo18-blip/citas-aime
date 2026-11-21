@@ -1097,12 +1097,34 @@ function pintarLista(tp){
 function edadEn(fecha){ const n=S.ficha&&S.ficha.nacimiento; if(!n||!fecha)return ""; const b=parseD(n),t=parseD(fecha);
   let m=(t.getFullYear()-b.getFullYear())*12+(t.getMonth()-b.getMonth()); if(t.getDate()<b.getDate())m--; if(m<0)return "";
   const a=Math.floor(m/12),r=m%12; return a?`${a} ${a===1?"año":"años"}${r?` y ${r} ${r===1?"mes":"meses"}`:""}`:`${r} ${r===1?"mes":"meses"}`; }
+/* ---------- reacciones a los hitos ---------- */
+const EMOJIS=["❤️","😍","😂","🥹","👏","😮"];
+function listenReacciones(){
+  return new Promise(res=>{ const un=db.collection("reacciones").onSnapshot(s=>{ const m={}; s.docs.forEach(d=>{const r=d.data(); (m[r.hito]=m[r.hito]||[]).push(r);}); S.reac=m; res(); if(S.view==="hitos")renderHitos(); },()=>res()); unsubs.push(un); });
+}
+function barraReacciones(hid){
+  const rs=(S.reac||{})[hid]||[], mias=(rs.find(r=>r.uid===S.uid)||{}).emojis||[];
+  return `<div class="reac" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 14px">${EMOJIS.map(e=>{
+    const n=rs.filter(r=>(r.emojis||[]).includes(e)).length, yo=mias.includes(e);
+    return `<button data-reac="${esc(hid)}" data-emo="${e}" style="padding:6px 10px;border-radius:99px;font-size:15px;border:2px solid ${yo?"var(--main)":"var(--line)"};background:${yo?"var(--main-soft)":"#fff"}">${e}${n?` <b style="font-size:13px">${n}</b>`:""}</button>`;}).join("")}</div>`;
+}
+async function reaccionar(hid,e){
+  if(!db||!S.uid)return;
+  const ref=db.doc(`reacciones/${hid}_${S.uid}`);
+  const rs=(S.reac||{})[hid]||[], mias=[...((rs.find(r=>r.uid===S.uid)||{}).emojis||[])];
+  const nuevas=mias.includes(e)?mias.filter(x=>x!==e):[...mias,e];
+  // se ve al momento
+  const otras=rs.filter(r=>r.uid!==S.uid); S.reac={...(S.reac||{}),[hid]:nuevas.length?[...otras,{hito:hid,uid:S.uid,emojis:nuevas}]:otras}; renderHitos();
+  escribir(nuevas.length?ref.set({hito:hid,uid:S.uid,emojis:nuevas,actualizado:new Date().toISOString()}):ref.delete());
+}
+document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest("[data-reac]"); if(!b)return; e.stopPropagation(); reaccionar(b.dataset.reac,b.dataset.emo); },true);
+
 function renderHitos(){
   const hs=S.hitos.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
-  $("#hitosList").innerHTML=hs.length?hs.map(x=>`<button class="card" data-hito="${esc(x.id)}" style="display:block;width:100%;text-align:left;padding:0;overflow:hidden">
+  $("#hitosList").innerHTML=hs.length?hs.map(x=>`<div class="card" style="padding:0;overflow:hidden"><button data-hito="${esc(x.id)}" style="display:block;width:100%;text-align:left;padding:0">
       ${x.img?`<img src="${esc(x.img)}" alt="" style="width:100%;max-height:340px;object-fit:cover;display:block">`:""}
       <div style="padding:14px 16px"><div class="small">${esc(fmtShort(x.fecha))}${edadEn(x.fecha)?` · con ${esc(edadEn(x.fecha))}`:""}</div>
-      <h3 style="font-size:18px;margin:4px 0">${esc(x.titulo||"")}</h3>${x.texto?`<div style="white-space:pre-wrap;color:#6d5a53">${esc(x.texto)}</div>`:""}</div></button>`).join("")
+      <h3 style="font-size:18px;margin:4px 0">${esc(x.titulo||"")}</h3>${x.texto?`<div style="white-space:pre-wrap;color:#6d5a53">${esc(x.texto)}</div>`:""}</div></button>${barraReacciones(x.id)}</div>`).join("")
     :`<div class="card"><div class="empty"><div class="big">⭐</div>Primeras palabras, el primer día de piscina, momentos especiales…${S.canWrite?"<br>Pulsa + para guardar el primero.":""}</div></div>`;
 }
 function formHito(x){
@@ -1376,7 +1398,7 @@ function startApp(){
   unsubs.push(db.doc("config/mensaje").onSnapshot(s=>{S.msgCfg=s.exists?s.data():{};renderMsgCfg();pintarFrase();},()=>{}));
   unsubs.push(db.doc("ficha/foto").onSnapshot(s=>{S.foto=s.exists?(s.data().img||""):"";renderHeader();},()=>{}));
 
-  Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos"),listen("hitos","hitos"),listenListas()])
+  Promise.all([listen("citas","citas"),listen("vacunas","vacunas"),listen("medidas","medidas"),listen("contactos","contactos"),listen("fiebre","fiebre"),listen("medicamentos","medicamentos"),listen("hitos","hitos"),listenReacciones(),listenListas()])
     .then(()=>{clearTimeout(timer);status("");});
 }
 let unUsers=null;
