@@ -20,6 +20,7 @@ function madrid(fecha, hora) { // hora local de Madrid -> instante real
   const guess = Date.UTC(y, m - 1, d, hh, mm);
   return guess - offsetMadrid(guess - offsetMadrid(guess));
 }
+function h12(v) { if (!v) return ""; const [H, M] = v.split(":").map(Number); return `${H % 12 || 12}:${String(M || 0).padStart(2, "0")} ${H < 12 ? "AM" : "PM"}`; }
 function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d - 1));
   return t.toISOString().slice(0, 10); }
 
@@ -64,11 +65,11 @@ function diaAntes(fecha) { const [y, m, d] = fecha.split("-").map(Number); const
     // 1) El día antes a las 19:00
     const t1 = madrid(diaAntes(c.fecha), "19:00");
     if (ahora >= t1 && ahora < (c.hora ? inicio : madrid(c.fecha, "08:00")))
-      pendientes.push({ id: clave + "_dia", title: `Mañana: ${titulo}`, body: `${nombre}${c.hora ? " a las " + c.hora : ""}${lugar}` });
+      pendientes.push({ id: clave + "_dia", title: `Mañana: ${titulo}`, body: `${nombre}${c.hora ? " a las " + h12(c.hora) : ""}${lugar}` });
     if (c.hora) {
       // 2) Una hora antes
       if (ahora >= inicio - 3600e3 && ahora < inicio)
-        pendientes.push({ id: clave + "_hora", title: `En 1 hora: ${titulo}`, body: `${nombre} a las ${c.hora}${lugar}` });
+        pendientes.push({ id: clave + "_hora", title: `En 1 hora: ${titulo}`, body: `${nombre} a las ${h12(c.hora)}${lugar}` });
     } else {
       // 2) Si no tiene hora, el mismo día a las 8:00
       if (ahora >= madrid(c.fecha, "08:00") && ahora < finDia)

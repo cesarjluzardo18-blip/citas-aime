@@ -119,6 +119,55 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 16px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
 .toast.show{opacity:1}
 .hidden{display:none!important}
+/* ---------- Vista de ordenador ---------- */
+.navBrand{display:none}
+@media (min-width:900px){
+  body{font-size:16px}
+  .app{max-width:1240px;padding:32px 40px 60px}
+  body.conNav .app{margin-left:250px;margin-right:auto}
+  #scr-auth,#scr-wait{max-width:460px;margin:40px auto 0}
+  nav.tabs{top:0;bottom:0;right:auto;width:250px;border-top:0;border-right:1px solid var(--line);flex-direction:column;justify-content:flex-start;padding:28px 16px;background:#fff}
+  nav.tabs .in{flex-direction:column;gap:6px;max-width:none}
+  .navBrand{display:flex;align-items:center;gap:10px;font-family:Fredoka;font-size:20px;font-weight:600;color:var(--ink);padding:0 8px 22px}
+  .navBrand span{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#FBD3C2,#F7B9C9);display:grid;place-items:center;color:#fff;font-size:20px}
+  nav.tabs button{flex:none;flex-direction:row;justify-content:flex-start;gap:14px;font-size:16px;padding:12px 14px;border-radius:14px}
+  nav.tabs button:hover{background:#FBF3EE}
+  nav.tabs button.on{background:var(--main-soft)}
+  nav.tabs button .ic{font-size:22px}
+  .fab{right:44px;bottom:44px;width:64px;height:64px}
+  header.top{margin-bottom:24px}
+  .avatar{width:64px;height:64px}
+  .top h1{font-size:30px}
+  /* ventanas en el centro */
+  .overlay{align-items:center;padding:30px}
+  .sheet{height:auto;max-height:90vh;max-width:640px;border-radius:22px;box-shadow:0 20px 60px rgba(74,59,54,.25);padding:26px 28px 28px}
+  .btn{width:auto;min-width:160px;display:inline-block;margin-right:8px}
+  .sheet .btn, #authForm .btn{width:100%;display:block;margin-right:0}
+  .toast{top:24px}
+  /* Dos columnas: Inicio, Calendario y Ficha */
+  #v-inicio:not(.hidden),#v-cal:not(.hidden),#v-ficha:not(.hidden){display:grid;gap:0 28px;align-items:start}
+  #v-inicio{grid-template-columns:minmax(320px,400px) 1fr}
+  #v-cal{grid-template-columns:minmax(420px,1.3fr) 1fr}
+  #v-ficha{grid-template-columns:1fr 1fr}
+  #citasList{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 14px;align-content:start}
+  #relojHora{font-size:56px!important}
+  .day{aspect-ratio:auto;height:64px;font-size:15px}
+  .day:hover{background:#FBF3EE}
+  /* Salud */
+  #v-salud{max-width:980px}
+  #v-salud .seg{max-width:620px}
+  #saludMed{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;align-items:start}
+  #saludMed>.row2,#saludMed>.small,#saludMed>.section-title,#saludMed>.card:last-child{grid-column:1/-1}
+  /* Hitos en mosaico */
+  #hitosList{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;align-items:start}
+  #hitosList .card{margin:0}
+  .list-item:hover,.cita:hover{filter:brightness(.985)}
+  button{cursor:pointer}
+}
+
+.tp{display:flex;align-items:center;gap:3px;min-width:0}
+.tp select{width:auto;flex:1;min-width:0;padding:12px 2px;text-align:center;text-align-last:center}
+.tp b{color:var(--muted)}
 .seg.four button{font-size:13px;padding:8px 2px}
 .temp{font-family:Fredoka;font-size:22px;min-width:64px;text-align:center;padding:6px 8px;border-radius:12px}
 .alert{background:#FFF1D6;border-radius:16px;padding:12px 14px;margin-bottom:12px;font-size:14px}
@@ -169,6 +218,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 
   <!-- INICIO -->
   <section id="v-inicio">
+    <div class="colA">
     <div class="alert hidden" id="notiBanner" style="background:#E6EEFA"><b style="color:#3D6597">🔔 Avisos de citas</b>
       <span id="notiBannerTx">Recibe un aviso el día antes y 1 hora antes de cada cita.</span>
       <button class="btn primary bNoti" type="button" style="background:#7FA6DA;margin-top:10px;padding:10px">Activar avisos</button></div>
@@ -184,15 +234,19 @@ nav.tabs button.on .ic{filter:none;opacity:1}
     </div>
     <button class="alert hidden" id="pendAviso" style="display:block;width:100%;text-align:left;border:0"><b>👋 Solicitudes de acceso</b><span id="pendAvisoTx"></span> <u>Revisar</u></button>
     <div id="heroBox"></div>
+    </div>
+    <div class="colB">
     <div class="seg" id="segCitas">
       <button class="on" data-s="prox">Próximas</button>
       <button data-s="hist">Historial</button>
     </div>
     <div id="citasList"></div>
+      </div>
   </section>
 
   <!-- CALENDARIO -->
   <section id="v-cal" class="hidden">
+    <div class="colA">
     <div class="card">
       <div class="cal-head">
         <button id="calPrev" aria-label="Mes anterior">‹</button>
@@ -202,9 +256,12 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <div class="grid" id="calGrid"></div>
       <div class="legend" id="legend"></div>
     </div>
+    </div>
+    <div class="colB">
     <button class="btn ghost" id="bCalTodas" style="margin:0 0 4px">🔔 Añadir avisos de todas las próximas citas</button>
     <div class="section-title"><h2 id="dayTitle"></h2></div>
     <div id="dayList"></div>
+      </div>
   </section>
 
   <!-- SALUD -->
@@ -230,11 +287,14 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 
   <!-- FICHA -->
   <section id="v-ficha" class="hidden">
+    <div class="colA">
     <div class="section-title"><h2>Ficha de Aime</h2><button class="chip editOnly" style="background:var(--main-soft);color:var(--main-dark)" id="editFicha">Editar</button></div>
     <div class="card" id="fichaBox"></div>
     <button class="btn primary bResumen" type="button" style="margin:0 0 4px;background:#8ACBA8">🩺 Resumen para el médico</button>
     <div class="section-title"><h2>Contactos</h2><button class="chip editOnly" style="background:var(--main-soft);color:var(--main-dark)" id="addContacto">+ Añadir</button></div>
     <div class="card" id="contactosBox"></div>
+    </div>
+    <div class="colB">
     <div id="personasWrap" class="hidden">
       <div class="section-title"><h2>Personas</h2><span class="chip hidden" id="pendBadge" style="background:#FFF1D6;color:#8A6A12"></span></div>
       <div class="small" id="activosTx" style="margin:-4px 4px 8px;color:#2F7A57;font-weight:700"></div>
@@ -253,7 +313,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
         <div class="small">Cada día se envía una frase bonita de madre e hija como notificación a las personas que marques.</div>
         <label style="display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px"><input id="msgOn" type="checkbox" style="width:22px;height:22px"> Enviar cada día</label>
         <div class="row2"><div><label>Para</label><input id="msgPara" value="Keyla"></div><div><label>De parte de</label><input id="msgDe" value="César"></div></div>
-        <label>A qué hora</label><input id="msgHora" type="time" value="09:00">
+        <label>A qué hora</label><span class="tpSlot" data-id="msgHora" data-v="09:00"></span>
         <label>A quién</label><div id="msgQuien"></div>
         <button class="btn primary" id="msgSave" type="button">Guardar</button>
       </div>
@@ -264,6 +324,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
       <button class="btn primary hidden bNoti" type="button" style="background:#7FA6DA">🔔 Activar avisos en este móvil</button>
       <button class="btn ghost hidden" id="bBackup" type="button">💾 Descargar copia de seguridad</button>
       <button class="btn ghost bSalir" type="button">Cerrar sesión</button></div>
+      </div>
   </section>
   </div>
 </div>
@@ -271,6 +332,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 <button class="fab" id="fab" aria-label="Añadir">+</button>
 
 <nav class="tabs"><div class="in">
+  <div class="navBrand"><span>A</span>Las citas de Aime</div>
   <button class="on" data-v="inicio"><span class="ic">🏠</span>Inicio</button>
   <button data-v="cal"><span class="ic">📅</span>Calendario</button>
   <button data-v="salud"><span class="ic">💉</span>Salud</button>
@@ -337,6 +399,18 @@ const S = { usuarios:[], uid:null, email:"", nombre:"", isAdmin:false, citas:[],
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad=n=>String(n).padStart(2,"0");
+// Hora en formato 12 h (AM/PM)
+function h12(v){ if(!v)return ""; const [H,M]=v.split(":").map(Number); if(isNaN(H))return v; const ap=H<12?"AM":"PM"; const hh=H%12||12; return `${hh}:${pad(M||0)} ${ap}`; }
+function tp(attr,v,style){ // selector de hora 12 h: guarda "HH:MM" en un input oculto
+  let H="",M="00",A="AM"; if(v){const [a,b]=v.split(":").map(Number); A=a<12?"AM":"PM"; H=String(a%12||12); M=pad(b||0);}
+  const mins=[...Array(12)].map((_,i)=>pad(i*5)); if(v&&!mins.includes(M))mins.push(M); mins.sort();
+  return `<span class="tp" style="${style||""}"><select class="tpH" aria-label="Hora"><option value="">--</option>${[12,1,2,3,4,5,6,7,8,9,10,11].map(x=>`<option ${String(x)===H?"selected":""}>${x}</option>`).join("")}</select><b>:</b><select class="tpM" aria-label="Minutos">${mins.map(m=>`<option ${m===M?"selected":""}>${m}</option>`).join("")}</select><select class="tpA" aria-label="AM o PM"><option ${A==="AM"?"selected":""}>AM</option><option ${A==="PM"?"selected":""}>PM</option></select><input type="hidden" ${attr} value="${v||""}"></span>`;
+}
+function tpSet(input,v){ const w=input.closest(".tp"); if(!w)return; const n=document.createElement("span"); n.innerHTML=tp("",v); const nw=n.firstChild; [".tpH",".tpM",".tpA"].forEach(s=>w.querySelector(s).innerHTML=nw.querySelector(s).innerHTML); input.value=v||""; }
+document.addEventListener("change",e=>{ const w=e.target.closest&&e.target.closest(".tp"); if(!w)return;
+  const H=w.querySelector(".tpH").value, M=w.querySelector(".tpM").value, A=w.querySelector(".tpA").value, inp=w.querySelector("input");
+  let v=""; if(H){ let hh=+H%12; if(A==="PM")hh+=12; v=`${pad(hh)}:${M}`; }
+  inp.value=v; inp.dispatchEvent(new Event("input",{bubbles:true})); });
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const parseD=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const fmtD=s=>{if(!s)return "";const d=parseD(s);return `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`};
@@ -365,7 +439,7 @@ function citaHTML(c){
     <div class="bar" style="background:${t.c}"></div>
     <div class="body">
       <div class="t">${t.e} ${esc(c.titulo||t.n)}</div>
-      <div class="m">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(c.hora)}`:""}${c.serieId?" · 🔁":""}</div>
+      <div class="m">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(h12(c.hora))}`:""}${c.serieId?" · 🔁":""}</div>
       ${c.lugar?`<div class="m">📍 ${esc(c.lugar)}</div>`:""}
     </div>
     <div class="right">
@@ -385,7 +459,7 @@ function renderInicio(){
     $("#heroBox").innerHTML=`<button class="hero" data-cita="${esc(n.id)}" style="display:block;width:100%;text-align:left">
       <div class="lbl">Próxima cita</div>
       <div class="t">${t.e} ${esc(n.titulo||t.n)}</div>
-      <div class="m">${esc(fmtD(n.fecha))}${n.hora?` a las ${esc(n.hora)}`:""}${n.lugar?` · ${esc(n.lugar)}`:""}</div>
+      <div class="m">${esc(fmtD(n.fecha))}${n.hora?` a las ${esc(h12(n.hora))}`:""}${n.lugar?` · ${esc(n.lugar)}`:""}</div>
       <div class="when">${countdown(n.fecha)}</div></button>`+alertH;
   } else $("#heroBox").innerHTML=alertH;
   document.querySelectorAll("#segCitas button").forEach(b=>b.classList.toggle("on",b.dataset.s===S.segC));
@@ -526,7 +600,7 @@ function showCita(id){
   const r=(k,v)=>v?`<div class="detail-row"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:"";
   openSheet(`<span class="chip" style="background:${t.c};color:${t.t}">${t.e} ${t.n}</span>
     <h2 style="margin-top:10px">${esc(c.titulo||t.n)}</h2>
-    <div class="small">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(c.hora)}`:""} · ${countdown(c.fecha)}</div>
+    <div class="small">${esc(fmtD(c.fecha))}${c.hora?` · ${esc(h12(c.hora))}`:""} · ${countdown(c.fecha)}</div>
     <div class="card" style="margin-top:14px">
       ${r("Lugar",c.lugar)}${r("Quién la lleva",c.quien)}${r("Qué llevar / preguntar",c.notas)}${r("Qué dijeron / resultado",c.resultado)}
       ${!c.lugar&&!c.quien&&!c.notas&&!c.resultado?'<div class="small">Sin más detalles.</div>':""}
@@ -563,7 +637,7 @@ function formCita(c){
     <div class="types" id="fTipos">${Object.entries(TIPOS).map(([k,t])=>`<button type="button" data-k="${k}" class="${k===sel?"on":""}" style="background:${t.c};color:${t.t}">${t.e} ${t.n}</button>`).join("")}</div>
     <label>Título (opcional)</label><input id="fTit" placeholder="Ej.: Revisión de los 2 años" value="${esc(c.titulo||"")}">
     <div class="row2" id="fFecRow"><div><label id="fFecLbl">Fecha</label><input id="fFec" type="date" value="${esc(c.fecha||"")}"></div>
-    <div id="fHorW"><label>Hora <span id="fHorZona" style="text-transform:none;letter-spacing:0;font-weight:600"></span></label><input id="fHor" type="time" value="${esc(c.hora||"")}"></div>
+    <div id="fHorW"><label>Hora <span id="fHorZona" style="text-transform:none;letter-spacing:0;font-weight:600"></span></label>${tp('id="fHor"',c.hora||"")}</div>
     <div id="fHastaW" class="hidden"><label>Hasta</label><input id="fHasta" type="date" value="${(()=>{const d=new Date();d.setMonth(d.getMonth()+3);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})()}"></div></div>
     ${isNew?`<div><label>¿Se repite?</label><select id="fRep"><option value="0">No</option><option value="x">Varias fechas</option><option value="7">Cada semana</option></select></div>
       <div id="fDiasW" class="hidden"><label>Qué días y a qué hora</label>
@@ -583,13 +657,13 @@ function formCita(c){
   const diasSel={}; // día de la semana -> hora
   const pintaDias=()=>{
     document.querySelectorAll("#fDias button").forEach(b=>{const on=b.dataset.d in diasSel;b.style.background=on?"var(--main)":"#fff";b.style.color=on?"#fff":"var(--ink)";b.style.borderColor=on?"var(--main)":"var(--line)";});
-    $("#fDiasHoras").innerHTML=[1,2,3,4,5,6,0].filter(n=>n in diasSel).map(n=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><b style="width:96px">${NOMDIA[n]}</b><input type="time" data-dh="${n}" value="${esc(diasSel[n]||"")}" style="flex:1"></div>`).join("");
+    $("#fDiasHoras").innerHTML=[1,2,3,4,5,6,0].filter(n=>n in diasSel).map(n=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><b style="width:96px">${NOMDIA[n]}</b>${tp(`data-dh="${n}"`,diasSel[n]||"","flex:1")}</div>`).join("");
     document.querySelectorAll("[data-dh]").forEach(i=>i.oninput=()=>diasSel[i.dataset.dh]=i.value);
   };
   if(isNew){
     const sueltas=[];
     const pintaSueltas=()=>{
-      $("#fSueltas").innerHTML=sueltas.map((s,i)=>`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="date" data-sf="${i}" value="${esc(s.fecha)}" style="flex:1.4"><input type="time" data-sh="${i}" value="${esc(s.hora)}" style="flex:1"><button type="button" data-sx="${i}" style="font-size:18px;color:var(--muted);padding:4px 6px">✕</button></div>`).join("");
+      $("#fSueltas").innerHTML=sueltas.map((s,i)=>`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="date" data-sf="${i}" value="${esc(s.fecha)}" style="flex:1.4">${tp(`data-sh="${i}"`,s.hora||"","flex:1")}<button type="button" data-sx="${i}" style="font-size:18px;color:var(--muted);padding:4px 6px">✕</button></div>`).join("");
       document.querySelectorAll("[data-sf]").forEach(x=>x.oninput=()=>sueltas[x.dataset.sf].fecha=x.value);
       document.querySelectorAll("[data-sh]").forEach(x=>x.oninput=()=>sueltas[x.dataset.sh].hora=x.value);
       document.querySelectorAll("[data-sx]").forEach(x=>x.onclick=()=>{sueltas.splice(+x.dataset.sx,1);pintaSueltas();});
@@ -747,13 +821,13 @@ function renderFiebre(){
   $("#saludFie").innerHTML=Object.keys(groups).map(d=>`<div class="section-title"><h2 style="font-size:16px">${esc(fmtD(d).replace(/^./,c=>c.toUpperCase()))}</h2><span class="small">${countdown(d)}</span></div>
     <div class="card">${groups[d].map(f=>{const [bg,fg]=tempColor(f.temp);return `<button class="list-item" data-fie="${esc(f.id)}">
       <span class="temp" style="background:${bg};color:${fg}">${f.temp?esc(f.temp)+"°":"—"}</span>
-      <span class="tx"><b>${esc(f.hora||"")}${f.sintomas?` · ${esc(f.sintomas)}`:""}</b><span>${f.dado?`💊 ${esc(f.dado)}`:"Sin medicación"}${f.notas?` · ${esc(f.notas)}`:""}</span></span></button>`}).join("")}</div>`).join("");
+      <span class="tx"><b>${esc(h12(f.hora||""))}${f.sintomas?` · ${esc(f.sintomas)}`:""}</b><span>${f.dado?`💊 ${esc(f.dado)}`:"Sin medicación"}${f.notas?` · ${esc(f.notas)}`:""}</span></span></button>`}).join("")}</div>`).join("");
 }
 function formFiebre(f){
   if(f&&!S.canWrite){return}
   const isNew=!f; const now=new Date(); f=f||{fecha:todayStr(),hora:`${pad(now.getHours())}:${pad(now.getMinutes())}`};
   openSheet(`<h2>${isNew?"Apuntar fiebre":"Editar registro"}</h2>
-    <div class="row2"><div><label>Fecha</label><input id="tFec" type="date" value="${esc(f.fecha)}"></div><div><label>Hora</label><input id="tHor" type="time" value="${esc(f.hora||"")}"></div></div>
+    <div class="row2"><div><label>Fecha</label><input id="tFec" type="date" value="${esc(f.fecha)}"></div><div><label>Hora</label>${tp('id="tHor"',f.hora||"")}</div></div>
     <label>Temperatura (°C)</label><input id="tTem" type="text" inputmode="decimal" step="0.1" placeholder="38,2" value="${esc(f.temp??"")}">
     <label>Síntomas</label><input id="tSin" placeholder="Tos, mocos, vómitos…" value="${esc(f.sintomas||"")}">
     <label>Qué se le dio</label><input id="tDad" placeholder="Medicamento y cantidad" value="${esc(f.dado||"")}">
@@ -990,7 +1064,7 @@ function resumenTexto(){
   L.push(ms[0]?`- ${fmtShort(ms[0].fecha)}: ${ms[0].peso?ms[0].peso+" kg":"—"} · ${ms[0].talla?ms[0].talla+" cm":"—"}`:"- Sin datos");
   const lim=(()=>{const d=new Date();d.setDate(d.getDate()-14);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`})();
   const fs=S.fiebre.filter(x=>x.fecha>=lim).sort((a,b)=>(b.fecha+(b.hora||"")).localeCompare(a.fecha+(a.hora||"")));
-  L.push("","FIEBRE Y SÍNTOMAS (últimos 14 días)"); L.push(...(fs.length?fs.map(x=>`- ${fmtShort(x.fecha)} ${x.hora||""}: ${x.temp?x.temp+"°C":""}${x.sintomas?` ${x.sintomas}`:""}${x.dado?` · dado: ${x.dado}`:""}`):["- Nada anotado"]));
+  L.push("","FIEBRE Y SÍNTOMAS (últimos 14 días)"); L.push(...(fs.length?fs.map(x=>`- ${fmtShort(x.fecha)} ${h12(x.hora||"")}: ${x.temp?x.temp+"°C":""}${x.sintomas?` ${x.sintomas}`:""}${x.dado?` · dado: ${x.dado}`:""}`):["- Nada anotado"]));
   const vp=S.vacunas.filter(v=>v.puesta).sort((a,b)=>(b.fechaPuesta||"").localeCompare(a.fechaPuesta||""));
   const vn=S.vacunas.filter(v=>!v.puesta);
   L.push("","VACUNAS PUESTAS"); L.push(...(vp.length?vp.map(v=>`- ${v.nombre}${v.dosis?` (${v.dosis})`:""}: ${fmtShort(v.fechaPuesta)}`):["- Ninguna anotada"]));
@@ -1021,16 +1095,17 @@ async function descargarCopia(){
   }catch(e){ toast("No se pudo hacer la copia"); }
 }
 
+document.querySelectorAll(".tpSlot").forEach(s=>{ s.outerHTML=tp(`id="${s.dataset.id}"`,s.dataset.v); });
 /* ---------- reloj y frase del día ---------- */
 function tickReloj(){ const d=new Date(); if(!$("#relojHora"))return;
-  $("#relojHora").textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  $("#relojHora").textContent=h12(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
   $("#relojFecha").textContent=`${DIAS[d.getDay()].replace(/^./,x=>x.toUpperCase())} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`; }
 setInterval(tickReloj,1000*15); tickReloj();
 const ZONA_NOMBRE={"Europe/Madrid":"España","America/New_York":"EE. UU.","America/Chicago":"EE. UU.","America/Denver":"EE. UU.","America/Phoenix":"EE. UU.","America/Los_Angeles":"EE. UU.","America/Anchorage":"EE. UU.","Pacific/Honolulu":"Hawái","America/Puerto_Rico":"Puerto Rico"};
 function zonaAime(){ return (S.general&&S.general.zona)||"Europe/Madrid"; }
 function tickAime(){ const el=$("#relojAime"); if(!el)return; let miZona=""; try{miZona=Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){}
-  const z=zonaAime(); const f=new Intl.DateTimeFormat("es-ES",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());
-  const yo=new Intl.DateTimeFormat("es-ES",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());
+  const z=zonaAime(); const f=h12(new Intl.DateTimeFormat("en-GB",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date()));
+  const yo=h12(new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date()));
   const distinta=miZona&&miZona!==z&&f!==yo; el.classList.toggle("hidden",!distinta);
   if(distinta) el.textContent=`🏠 En casa de Aime (${ZONA_NOMBRE[z]||z}): ${f}`; }
 setInterval(tickAime,1000*15);
@@ -1051,7 +1126,7 @@ function renderMsgCfg(){
   $("#zonaWrap").classList.toggle("hidden",!S.gestiona);
   $("#msgCfgWrap").classList.toggle("hidden",!S.isAdmin); if(!S.isAdmin)return;
   const c=S.msgCfg||{}; const quien=new Set(c.destinatarios||[]);
-  if(!S._msgCfgTocado){ $("#msgOn").checked=!!c.activo; $("#msgHora").value=c.hora||"09:00"; $("#msgPara").value=c.para||"Keyla"; $("#msgDe").value=c.de||"César"; }
+  if(!S._msgCfgTocado){ $("#msgOn").checked=!!c.activo; tpSet($("#msgHora"),c.hora||"09:00"); $("#msgPara").value=c.para||"Keyla"; $("#msgDe").value=c.de||"César"; }
   const us=S.usuarios.filter(u=>["ver","editar"].includes(u.rol)||(u.email||"").toLowerCase()===ADMIN);
   $("#msgQuien").innerHTML=us.length?us.map(u=>`<label style="display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px;margin:8px 0;text-transform:none;letter-spacing:0"><input type="checkbox" data-mq="${esc(u.id)}" ${quien.has(u.id)?"checked":""} style="width:22px;height:22px"> ${esc(u.nombre||u.email||"")}</label>`).join(""):`<div class="small">Primero aprueba a las personas.</div>`;
 }
@@ -1097,6 +1172,7 @@ const ROLES={pendiente:"Pendiente",ver:"Solo ver",editar:"Puede editar",bloquead
 function screen(name){
   ["auth","wait","main"].forEach(n=>$("#scr-"+n).classList.toggle("hidden",n!==name));
   $("nav.tabs").classList.toggle("hidden",name!=="main");
+  document.body.classList.toggle("conNav",name==="main");
   if(name!=="main")$("#fab").classList.remove("show"); else updateFab();
 }
 function haceCuanto(ms){
