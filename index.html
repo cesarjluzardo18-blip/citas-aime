@@ -119,6 +119,8 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 .toast{position:fixed;left:50%;top:calc(var(--safe-t) + 16px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
 .toast.show{opacity:1}
 .hidden{display:none!important}
+.buscar{margin-bottom:12px}
+.buscar input{border-radius:99px;padding:13px 18px;box-shadow:var(--shadow);border-color:transparent;font-size:16px}
 /* ---------- Vista de ordenador ---------- */
 .navBrand{display:none}
 @media (min-width:900px){
@@ -147,6 +149,8 @@ nav.tabs button.on .ic{filter:none;opacity:1}
   /* Dos columnas: Inicio, Calendario y Ficha */
   #v-inicio:not(.hidden),#v-cal:not(.hidden),#v-ficha:not(.hidden){display:grid;gap:0 28px;align-items:start}
   #v-inicio{grid-template-columns:minmax(320px,400px) 1fr}
+  #v-inicio>.buscar{grid-column:1/-1;max-width:720px}
+  #v-inicio.buscando>.colB{grid-column:1/-1}
   #v-cal{grid-template-columns:minmax(420px,1.3fr) 1fr}
   #v-ficha{grid-template-columns:1fr 1fr}
   #citasList{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 14px;align-content:start}
@@ -218,6 +222,7 @@ nav.tabs button.on .ic{filter:none;opacity:1}
 
   <!-- INICIO -->
   <section id="v-inicio">
+    <div class="buscar"><input id="buscar" type="search" placeholder="🔎 Buscar citas, vacunas, medicinas, hitos…" autocomplete="off"></div>
     <div class="colA">
     <div class="alert hidden" id="notiBanner" style="background:#E6EEFA"><b style="color:#3D6597">🔔 Avisos de citas</b>
       <span id="notiBannerTx">Recibe un aviso el día antes y 1 hora antes de cada cita.</span>
@@ -449,7 +454,35 @@ function citaHTML(c){
     </div></button>`;
 }
 
+/* ---------- buscador ---------- */
+const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+function resultadosBusqueda(q){
+  const t=norm(q).trim().split(/\s+/).filter(Boolean); if(!t.length)return [];
+  const ok=campos=>{ const txt=norm(campos.join(" ")); return t.every(w=>txt.includes(w)); };
+  const R=[];
+  sortCitas(S.citas).reverse().forEach(c=>{ const tp=tipo(c.tipo);
+    if(ok([c.titulo,tp.n,c.lugar,c.notas,c.resultado,c.quien,fmtD(c.fecha),c.fecha]))
+      R.push({ico:tp.e,bg:tp.c,t:c.titulo||tp.n,s:`${fmtD(c.fecha)}${c.hora?" · "+h12(c.hora):""}${c.lugar?" · "+c.lugar:""}`,a:`data-cita="${esc(c.id)}"`,k:"Cita"}); });
+  S.vacunas.forEach(v=>{ if(ok(["vacuna",v.nombre,v.dosis,v.notas])) R.push({ico:"💉",bg:"#B7E4CF",t:v.nombre,s:v.puesta?`Puesta el ${fmtShort(v.fechaPuesta)}`:(v.prevista?`Prevista: ${fmtShort(v.prevista)}`:"Pendiente"),a:`data-vac="${esc(v.id)}"`,k:"Vacuna"}); });
+  S.medicamentos.forEach(m=>{ if(ok(["medicina medicamento",m.nombre,m.para,m.pauta,m.notas])) R.push({ico:"💊",bg:"#FFF1D6",t:m.nombre,s:`${m.para?m.para+" · ":""}${fmtShort(m.inicio)}${m.fin?" – "+fmtShort(m.fin):""}`,a:`data-rx="${esc(m.id)}"`,k:"Medicina"}); });
+  S.fiebre.forEach(f=>{ if(ok(["fiebre",f.sintomas,f.dado,f.notas,f.temp])) R.push({ico:"🌡️",bg:"#FCD9C4",t:`${f.temp?f.temp+"° ":""}${f.sintomas||"Fiebre"}`,s:`${fmtShort(f.fecha)}${f.hora?" · "+h12(f.hora):""}`,a:`data-fie="${esc(f.id)}"`,k:"Fiebre"}); });
+  S.hitos.forEach(x=>{ if(ok(["hito momento",x.titulo,x.texto])) R.push({ico:"⭐",bg:"#F4C6D4",t:x.titulo,s:fmtShort(x.fecha),a:`data-hito="${esc(x.id)}"`,k:"Hito"}); });
+  S.contactos.forEach(c=>{ if(ok(["contacto",c.nombre,c.rol,c.telefono])) R.push({ico:"📞",bg:"#FDE6DB",t:c.nombre,s:`${c.rol||""}${c.telefono?" · "+c.telefono:""}`,a:S.canWrite?`data-con="${esc(c.id)}"`:"",k:"Contacto"}); });
+  return R;
+}
+function pintarBusqueda(){
+  const q=$("#buscar").value, R=resultadosBusqueda(q);
+  $("#citasList").innerHTML=`<div class="small" style="margin:0 4px 10px;grid-column:1/-1">${R.length?`${R.length} resultado${R.length>1?"s":""} para «${esc(q)}»`:`Nada encontrado para «${esc(q)}»`}</div>`+
+    R.map(r=>`<button class="cita" ${r.a}><div class="bar" style="background:${r.bg}"></div><div class="body"><div class="t">${r.ico} ${esc(r.t)}</div><div class="m">${esc(r.s)}</div></div><div class="right"><span class="chip" style="background:${r.bg}">${r.k}</span></div></button>`).join("");
+}
+$("#buscar").addEventListener("input",()=>render());
+
 function renderInicio(){
+  const buscando=$("#buscar").value.trim().length>0;
+  document.querySelector("#v-inicio .colA").classList.toggle("hidden",buscando);
+  $("#v-inicio").classList.toggle("buscando",buscando);
+  $("#segCitas").classList.toggle("hidden",buscando);
+  if(buscando){ pintarBusqueda(); return; }
   const dups=S.canWrite?citasRepetidas():[];
   $("#dupAviso").classList.toggle("hidden",!dups.length);
   if(dups.length) $("#dupAvisoTx").textContent=` Hay ${dups.length} cita${dups.length>1?"s":""} apuntada${dups.length>1?"s":""} dos veces.`;
